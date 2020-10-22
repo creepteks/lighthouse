@@ -1,0 +1,22 @@
+{
+  "name": "lighthouse",
+  "version": "0.0.0",
+  "description": "anonymous reputation system for c2c market ",
+  "main": "index.js",
+  "scripts": {
+    "test": "beacon"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mahdad-Baghani/lighthouse.git"
+  },
+  "author": "kreepteks",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Mahdad-Baghani/lighthouse/issues"
+  },
+  "homepage": "https://github.com/Mahdad-Baghani/lighthouse#readme",
+  "dependencies": {
+    "ethr-did": "^1.1.0"
+  }
+}
