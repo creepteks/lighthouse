@@ -7,9 +7,14 @@ import transports from 'uport-transports/lib/transport/index.js'
 import message from 'uport-transports/lib/message/util.js'
 import { Resolver } from 'did-resolver'
 import { getResolver } from 'ethr-did-resolver'
+import path from "path" 
+import jsdom from "jsdom";
+import fs from "fs"
 
 let endpoint = ''
+var __dirname = path.resolve();
 const app = express();
+const { JSDOM } = jsdom;
 app.use(bodyParser.json({ type: '*/*' }))
 
 // You can set a rpc endpoint to be used by the web3 provider
@@ -42,7 +47,18 @@ app.get('/', (req, res) => {
     console.log(decodeJWT(requestToken))  //log request token to console
     const uri = message.paramsToQueryString(message.messageToURI(requestToken), { callback_type: 'post' })
     const qr = transports.ui.getImageDataURI(uri)
-    res.send(`<div><img src="${qr}"/></div>`)
+
+    // stop serving simple html string as response
+    // res.send(`<h3>Scan This QR code using uport mobile app</h3><div><img src="${qr}"/></div>`)
+
+    // instead, I started using the jsdom to walk through the dom to inject my qr code at runtime
+    fs.readFile(path.join(__dirname + `/www/index.html`), "utf8", function (err, data) {
+      var dom = new JSDOM(data)
+      dom.window.addEventListener("DOMContentLoaded", function() {
+        dom.window.document.getElementById("qrcode-placeholder").innerHTML = `<div><img src="${qr}"/></div>`
+        res.send(dom.serialize())
+      }, false)
+    })
   })
 })
 
@@ -115,9 +131,4 @@ app.post('/attestId', (req, res) => {
 })
 
 // run the app server and tunneling service
-const server = app.listen(8088, () => {
-  ngrok.connect(8088).then(ngrokUrl => {
-    endpoint = ngrokUrl
-    console.log(`Login Service running, open at ${endpoint}`)
-  })
-})
+app.listen(8088);
