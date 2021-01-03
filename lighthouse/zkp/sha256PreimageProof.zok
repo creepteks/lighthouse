@@ -1,0 +1,5 @@
+import "hashes/sha256/512bit" as sha256
+
+def main (private u32[16] preimage, u32[8] commitment) -> (bool):
+    u32[8] h = sha256(preimage[0..8], preimage[8..16])
+    return h == commitment
