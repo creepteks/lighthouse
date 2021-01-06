@@ -1,0 +1,3 @@
+{
+    "solidity.packageDefaultDependenciesDirectory": "lighthouse/contracts/node_modules"
+}
