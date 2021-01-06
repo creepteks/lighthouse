@@ -1,3 +1,4 @@
 bin
 witness
 *.key
+proof.json
