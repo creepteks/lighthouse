@@ -1,0 +1,22 @@
+{
+  "inputs": [
+    {
+      "name": "inp",
+      "public": true,
+      "type": "array",
+      "components": {
+        "size": 16,
+        "type": "u32"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "type": "array",
+      "components": {
+        "size": 8,
+        "type": "u32"
+      }
+    }
+  ]
+}

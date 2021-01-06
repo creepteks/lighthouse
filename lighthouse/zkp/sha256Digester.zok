@@ -1,0 +1,5 @@
+import "hashes/sha256/512bit" as sha256
+
+def main(u32[16] inp) -> u32[8]:
+    u32[8] hash = sha256(inp[0..8], inp[8..16])
+    return hash
