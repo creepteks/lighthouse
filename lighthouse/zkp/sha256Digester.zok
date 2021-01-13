@@ -1,5 +1,19 @@
-import "hashes/sha256/512bit" as sha256
+// import "hashes/sha256/512bit" as sha256
 
-def main(u32[16] inp) -> u32[8]:
+// def main(u32[16] inp) -> u32[8]:
+//     u32[8] hash = sha256(inp[0..8], inp[8..16])
+//     return hash
+
+import "hashes/sha256/512bit" as sha256
+import "utils/casts/u32_to_bits" as u32_to_bits
+
+def main(u32[16] inp) -> bool[256]:
     u32[8] hash = sha256(inp[0..8], inp[8..16])
-    return hash
+    bool[256] hashBits = [false; 256]
+    for field i in 0..8 do
+        bool[32] val = u32_to_bits(hash[i])
+        for field bit in 0..32 do
+            hashBits[i*32+bit] = val[bit]
+         endfor
+     endfor
+    return hashBits
