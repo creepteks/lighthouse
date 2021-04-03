@@ -31,24 +31,25 @@ use serde_json;
 
 
 pub fn blind_signature_test() {
+    let mut rng = OsRng{};
     // PHASE 01: signer side
     // create pub/sec keypair
     // TODO refactor this to a separate utility func
-    let basepoint = constants::ED25519_BASEPOINT_POINT;
+    let g = constants::ED25519_BASEPOINT_POINT;
     // permenant keypair
-    let x = Scalar::from(rand::random::<u64>());
-    let p = x * basepoint;
+    let x = Scalar::random(&mut rng);
+    let p = x * g;
     // ephemeral keypair
-    let k = Scalar::from(rand::random::<u64>());
-    let r = k * basepoint;
+    let k = Scalar::random(&mut rng);
+    let r = k * g;
 
     // PHASE 02: user side
-    let a = Scalar::from(rand::random::<u64>());
-    let b = Scalar::from(rand::random::<u64>());
+    let a = Scalar::random(&mut rng);
+    let b = Scalar::random(&mut rng);
 
     // create a SHA2-512 object
     // this type of hashing is coming from the example of scalar.rs
-    let r_prime = (a * r) + (b * p);
+    let r_prime = r + (a * g) + (b * p);
     let h = Sha512::new()
         .chain(serde_json::to_string(&r_prime).unwrap())
         .chain(serde_json::to_string(&p).unwrap())
@@ -57,19 +58,14 @@ pub fn blind_signature_test() {
     let e = e_prime + b;
 
     // PHASE 03 server side
-    let s = e * x;
+    let s = e * x + k;
 
     // PHASE 04 user side
     let s_prime = s + a;
 
     // VERIFICATION step
-    let rhs = s_prime * basepoint;
-    let h_prime = Sha512::new()
-        .chain(serde_json::to_string(&r_prime).unwrap())
-        .chain(serde_json::to_string(&p).unwrap())
-        .chain("my vote address commitment");
-    let e_xegond = Scalar::from_hash(h_prime);
-    let lhs = e_xegond * p + r_prime;
+    let rhs = s_prime * g;
+    let lhs = e_prime * p + r_prime;
 
     assert_eq!(rhs, lhs);
 }
