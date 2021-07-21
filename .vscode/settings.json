@@ -1,3 +1,6 @@
 {
-    "solidity.packageDefaultDependenciesDirectory": "lighthouse/ethcode/contracts/node_modules"
+    "solidity.packageDefaultDependenciesDirectory": "lighthouse/ethcode/contracts/node_modules",
+    "rust-analyzer.linkedProjects": [
+    {"protocol":"lighthouse/protocol"}
+    ]
 }

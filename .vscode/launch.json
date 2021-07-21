@@ -7,9 +7,9 @@
         {
             "type": "lldb",
             "request": "custom",
-            "name": "Custom launch",
+            "name": "Rust: Custom launch",
             "targetCreateCommands": [
-                "target create ${workspaceFolder}/lighthouse/blindsig/target/debug/blindsig"
+                "target create ${workspaceFolder}/lighthouse/protocol/target/debug/protocol"
             ],
             "processCreateCommands": [
                 "settings set target.run-args value1 value2 value3",
