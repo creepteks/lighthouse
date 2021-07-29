@@ -1,0 +1,12 @@
+{
+  "name": "lighthouse",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "bootstrap": "lerna bootstrap",
+    "build": "lerna run build"
+  },
+  "devDependencies": {
+    "lerna": "^4.0.0"
+  }
+}
