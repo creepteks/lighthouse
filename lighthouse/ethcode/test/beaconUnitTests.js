@@ -13,7 +13,7 @@ const REVERT = "Returned error: VM Exception while processing transaction: rever
 describe('beacon issuance unit test', function (deployer, network) {
     const [owner, other] = accounts;
     // read the zkp proof
-    const proof = JSON.parse(fs.readFileSync("../zkp/proof.json"))
+    const proof = JSON.parse(fs.readFileSync("../circuits/zokrates/proof.json"))
 
     beforeEach(async function () {
         var lib = await byteutils.new();
