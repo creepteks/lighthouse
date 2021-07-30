@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.0;
+pragma solidity ^0.5.0;
 
 import "./verifier.sol";
 import "./utils/byteutils.sol";
@@ -13,7 +13,7 @@ contract beacon is Verifier {
     }
     mapping(bytes32 => ballot) public beacons;
 
-    function registerVoter(uint[9] calldata input) public returns (bool successful) {
+    function registerVoter(uint[9] memory input) public returns (bool successful) {
         bytes memory hdid = abi.encode(input);
         // bytesToBytes32 only reads the first 32 bytes, so should not worry about the 9th element of input 
         bytes32 hdid32 = byteutils.bytesToBytes32(hdid, 0);
@@ -27,12 +27,12 @@ contract beacon is Verifier {
     uint[2] memory a,
     uint[2][2] memory b,
     uint[2] memory c, 
-    uint[9] memory input, 
+    uint[4] memory input, 
     string memory ecnryptedVote) 
     public returns (bool result) {
         result = false;
         // verify the zkp
-        require(verifyTx(a, b, c, input), 'invalid zk proof. Abort');
+        require(verifyProof(a, b, c, input), 'invalid zk proof. Abort');
 
         bytes memory hashed  = abi.encode(input);
         // bytesToBytes32 only reads the first 32 bytes, so should not worry about the 9th element of input 

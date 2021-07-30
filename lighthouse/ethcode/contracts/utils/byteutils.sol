@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.0;
+pragma solidity ^0.5.0;
 
  library byteutils {
-    function bytesToBytes32(bytes calldata b, uint offset) public pure returns (bytes32) {
+    function bytesToBytes32(bytes memory b, uint offset) public pure returns (bytes32) {
         bytes32 out;
 
         for (uint i = 0; i < 32; i++) {
