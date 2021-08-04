@@ -26,27 +26,6 @@ import { IncrementalMerkleTree } from "./IncrementalMerkleTree.sol";
 import "./Ownable.sol";
 
 contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
-    // The external nullifier helps to prevent double-signalling by the same
-    // user. An external nullifier can be active or deactivated.
-
-    // Each node in the linked list
-    struct ExternalNullifierNode {
-        uint232 next;
-        bool exists;
-        bool isActive;
-    }
-
-    // We store the external nullifiers using a mapping of the form:
-    // enA => { next external nullifier; if enA exists; if enA is active }
-    // Think of it as a linked list.
-    mapping (uint232 => ExternalNullifierNode) public
-        externalNullifierLinkedList;
-
-    uint256 public numExternalNullifiers = 0;
-    
-    // First and last external nullifiers for linked list enumeration
-    uint232 public firstExternalNullifier = 0;
-    uint232 public lastExternalNullifier = 0;
 
     // Whether broadcastSignal() can only be called by the owner of this
     // contract. This is the case as a safe default.
@@ -56,11 +35,6 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
     mapping (uint256 => bool) public nullifierHashHistory;
 
     event PermissionSet(bool indexed newPermission);
-    event ExternalNullifierAdd(uint232 indexed externalNullifier);
-    event ExternalNullifierChangeStatus(
-        uint232 indexed externalNullifier,
-        bool indexed active
-    );
 
     // This value should be equal to
     // 0x7d10c03d1f7884c85edee6353bd2b2ffbae9221236edde3778eac58089912bc0
@@ -94,7 +68,6 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         IncrementalMerkleTree(_treeLevels, NOTHING_UP_MY_SLEEVE_ZERO)
         Ownable()
         public {
-            addEn(_firstExternalNullifier, true);
     }
 
     /*
@@ -222,12 +195,11 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         uint256[8] memory _proof,
         uint256 _root,
         uint256 _nullifiersHash,
-        uint256 _signalHash,
-        uint232 _externalNullifier
+        uint256 _signalHash
     ) public view returns (bool) {
 
-        uint256[4] memory publicSignals =
-            [_root, _nullifiersHash, _signalHash, _externalNullifier];
+        uint256[3] memory publicSignals =
+            [_root, _nullifiersHash, _signalHash];
 
         (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) = 
             unpackProof(_proof);
@@ -235,7 +207,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         return nullifierHashHistory[_nullifiersHash] == false &&
             hashSignal(_signal) == _signalHash &&
             _signalHash == hashSignal(_signal) &&
-            isExternalNullifierActive(_externalNullifier) &&
+            // isExternalNullifierActive(_externalNullifier) &&
             rootHistory[_root] &&
             areAllValidFieldElements(_proof) &&
             _root < SNARK_SCALAR_FIELD &&
@@ -256,8 +228,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         bytes memory _signal,
         uint256[8] memory _proof,
         uint256 _root,
-        uint256 _nullifiersHash,
-        uint232 _externalNullifier
+        uint256 _nullifiersHash
     ) {
         // Check whether each element in _proof is a valid field element. Even
         // if verifier.sol does this check too, it is good to do so here for
@@ -273,12 +244,6 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             "Semaphore: nullifier already seen"
         );
 
-        // Check whether the nullifier hash is active
-        require(
-            isExternalNullifierActive(_externalNullifier),
-            "Semaphore: external nullifier not found"
-        );
-
         // Check whether the given Merkle root has been seen previously
         require(rootHistory[_root], "Semaphore: root not seen");
 
@@ -290,8 +255,8 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             "Semaphore: the nullifiers hash must be lt the snark scalar field"
         );
 
-        uint256[4] memory publicSignals =
-            [_root, _nullifiersHash, signalHash, _externalNullifier];
+        uint256[3] memory publicSignals =
+            [_root, _nullifiersHash, signalHash];
 
         (uint256[2] memory a, uint256[2][2] memory b, uint256[2] memory c) =
             unpackProof(_proof);
@@ -320,12 +285,11 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         bytes memory _signal,
         uint256[8] memory _proof,
         uint256 _root,
-        uint256 _nullifiersHash,
-        uint232 _externalNullifier
+        uint256 _nullifiersHash
     ) public 
         onlyOwnerIfPermissioned
         isValidSignalAndProof(
-            _signal, _proof, _root, _nullifiersHash, _externalNullifier
+            _signal, _proof, _root, _nullifiersHash
         )
     {
         // Client contracts should be responsible for storing the signal and/or
@@ -335,133 +299,6 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         nullifierHashHistory[_nullifiersHash] = true;
     }
 
-    /*
-     * A private helper function which adds an external nullifier.
-     * @param _externalNullifier The external nullifier to add.
-     * @param _isFirst Whether _externalNullifier is the first external
-     * nullifier. Only the constructor should set _isFirst to true when it
-     * calls addEn().
-     */
-    function addEn(uint232 _externalNullifier, bool isFirst) private {
-        if (isFirst) {
-            firstExternalNullifier = _externalNullifier;
-        } else {
-            // The external nullifier must not have already been set
-            require(
-                externalNullifierLinkedList[_externalNullifier].exists == false,
-                "Semaphore: external nullifier already set"
-            );
-
-            // Connect the previously added external nullifier node to this one
-            externalNullifierLinkedList[lastExternalNullifier].next =
-                _externalNullifier;
-        }
-
-        // Add a new external nullifier
-        externalNullifierLinkedList[_externalNullifier].next = 0;
-        externalNullifierLinkedList[_externalNullifier].isActive = true;
-        externalNullifierLinkedList[_externalNullifier].exists = true;
-
-        // Set the last external nullifier to this one
-        lastExternalNullifier = _externalNullifier;
-
-        numExternalNullifiers ++;
-
-        emit ExternalNullifierAdd(_externalNullifier);
-    }
-
-    /*
-     * Adds an external nullifier to the contract. This external nullifier is
-     * active once it is added. Only the owner can do this.
-     * @param _externalNullifier The new external nullifier to set.
-     */
-    function addExternalNullifier(uint232 _externalNullifier) public
-    onlyOwner {
-        addEn(_externalNullifier, false);
-    }
-
-    /*
-     * Deactivate an external nullifier. The external nullifier must already be
-     * active for this function to work. Only the owner can do this.
-     * @param _externalNullifier The new external nullifier to deactivate.
-     */
-    function deactivateExternalNullifier(uint232 _externalNullifier) public
-    onlyOwner {
-        // The external nullifier must already exist
-        require(
-            externalNullifierLinkedList[_externalNullifier].exists,
-            "Semaphore: external nullifier not found"
-        );
-
-        // The external nullifier must already be active
-        require(
-            externalNullifierLinkedList[_externalNullifier].isActive == true,
-            "Semaphore: external nullifier already deactivated"
-        );
-
-        // Deactivate the external nullifier. Note that we don't change the
-        // value of nextEn.
-        externalNullifierLinkedList[_externalNullifier].isActive = false;
-
-        emit ExternalNullifierChangeStatus(_externalNullifier, false);
-    }
-
-    /*
-     * Reactivate an external nullifier. The external nullifier must already be
-     * inactive for this function to work. Only the owner can do this.
-     * @param _externalNullifier The new external nullifier to reactivate.
-     */
-    function reactivateExternalNullifier(uint232 _externalNullifier) public
-    onlyOwner {
-        // The external nullifier must already exist
-        require(
-            externalNullifierLinkedList[_externalNullifier].exists,
-            "Semaphore: external nullifier not found"
-        );
-
-        // The external nullifier must already have been deactivated
-        require(
-            externalNullifierLinkedList[_externalNullifier].isActive == false,
-            "Semaphore: external nullifier is already active"
-        );
-
-        // Reactivate the external nullifier
-        externalNullifierLinkedList[_externalNullifier].isActive = true;
-
-        emit ExternalNullifierChangeStatus(_externalNullifier, true);
-    }
-
-    /*
-     * Returns true if and only if the specified external nullifier is active
-     * @param _externalNullifier The specified external nullifier.
-     */
-    function isExternalNullifierActive(uint232 _externalNullifier) public view
-    returns (bool) {
-        return externalNullifierLinkedList[_externalNullifier].isActive;
-    }
-
-    /*
-     * Returns the next external nullifier after the specified external
-     * nullifier in the linked list.
-     * @param _externalNullifier The specified external nullifier.
-     */
-    function getNextExternalNullifier(uint232 _externalNullifier) public view
-    returns (uint232) {
-
-        require(
-            externalNullifierLinkedList[_externalNullifier].exists,
-            "Semaphore: no such external nullifier"
-        );
-
-        uint232 n = externalNullifierLinkedList[_externalNullifier].next;
-
-        require(
-            numExternalNullifiers > 1 && externalNullifierLinkedList[n].exists,
-            "Semaphore: no external nullifier exists after the specified one"
-        );
-        
-        return n;
-    }
 
     /*
      * Returns the number of inserted identity commitments.

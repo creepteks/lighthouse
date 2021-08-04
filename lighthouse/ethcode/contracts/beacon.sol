@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.5.0;
 
-import "./verifier.sol";
+import "./zok_verifier.sol";
 import "./utils/byteutils.sol";
 
-contract beacon is Verifier {
+contract beacon is ZokVerifier {
     // whether the vote is still in voters position or has been cast into the ballot box
     enum ballotState {raw, registered, burnt }
     struct ballot {
@@ -27,12 +27,12 @@ contract beacon is Verifier {
     uint[2] memory a,
     uint[2][2] memory b,
     uint[2] memory c, 
-    uint[4] memory input, 
+    uint[9] memory input, 
     string memory ecnryptedVote) 
     public returns (bool result) {
         result = false;
         // verify the zkp
-        require(verifyProof(a, b, c, input), 'invalid zk proof. Abort');
+        require(verifyTx(a, b, c, input), 'invalid zk proof. Abort');
 
         bytes memory hashed  = abi.encode(input);
         // bytesToBytes32 only reads the first 32 bytes, so should not worry about the 9th element of input 
