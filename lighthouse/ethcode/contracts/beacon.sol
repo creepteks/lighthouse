@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.5.0;
 
-import "./zok_verifier.sol";
-import "./utils/byteutils.sol";
+import "./libs/zok_verifier.sol";
+import "./libs/byteutils.sol";
 
 contract beacon is ZokVerifier {
     // whether the vote is still in voters position or has been cast into the ballot box
@@ -12,7 +12,12 @@ contract beacon is ZokVerifier {
         string encrypted;
     }
     mapping(bytes32 => ballot) public beacons;
+    uint8 levels;
 
+    constructor(uint8 _treeLevels)
+        public {
+            levels = _treeLevels;
+    }
     function registerVoter(uint[9] memory input) public returns (bool successful) {
         bytes memory hdid = abi.encode(input);
         // bytesToBytes32 only reads the first 32 bytes, so should not worry about the 9th element of input 
