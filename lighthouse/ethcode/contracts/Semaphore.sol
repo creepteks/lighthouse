@@ -64,7 +64,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      * @param _treeLevels The depth of the identity tree.
      * @param _firstExternalNullifier The first identity nullifier to add.
      */
-    constructor(uint8 _treeLevels, uint232 _firstExternalNullifier)
+    constructor(uint8 _treeLevels)
         IncrementalMerkleTree(_treeLevels, NOTHING_UP_MY_SLEEVE_ZERO)
         Ownable()
         public {

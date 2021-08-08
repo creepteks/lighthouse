@@ -22,6 +22,8 @@
     "@truffle/artifactor": "^4.0.115",
     "@truffle/contract": "^4.3.27",
     "chai": "^4.2.0",
+    "etherlime": "^2.2.4",
+    "etherlime-lib": "^1.1.5",
     "ganache-cli": "^6.12.1",
     "libsemaphore": "^1.0.16",
     "mocha": "^8.2.1",
@@ -33,5 +35,7 @@
   "directories": {
     "test": "test"
   },
-  "dependencies": {}
+  "dependencies": {
+    "ethers": "^4.0.38"
+  }
 }
