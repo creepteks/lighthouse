@@ -6,10 +6,6 @@ const fs = require('fs');
 const beacon = contract.fromArtifact('beacon');
 const byteutils = contract.fromArtifact('byteutils');
 
-// err messages
-const REVERT = "Returned error: VM Exception while processing transaction: revert ERC20: transfer amount exceeds balance -- Reason given: ERC20: transfer amount exceeds balance."
-
-
 describe('beacon issuance unit test', function (deployer, network) {
     const [owner, other] = accounts;
     // read the zkp proof
@@ -19,7 +15,7 @@ describe('beacon issuance unit test', function (deployer, network) {
         var lib = await byteutils.new();
         await beacon.detectNetwork();
         await beacon.link('byteutils', lib.address);
-        this.contract = await beacon.new();
+        this.contract = await beacon.new(20);
     });
 
     // test cases

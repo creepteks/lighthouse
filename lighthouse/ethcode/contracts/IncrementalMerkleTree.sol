@@ -22,7 +22,8 @@
 pragma solidity ^0.5.0;
 
 import { SnarkConstants } from "./SnarkConstants.sol";
-import { MiMC } from "./MiMC.sol";
+import {PoseidonT3} from "./Poseidon.sol";
+
 
 contract IncrementalMerkleTree is SnarkConstants {
     // The maximum tree depth
@@ -152,29 +153,14 @@ contract IncrementalMerkleTree is SnarkConstants {
         return currentIndex;
     }
 
-    /*
-     * Concatenates and hashes two `uint256` values (left and right) using
-     * a combination of MiMCSponge and `addmod`.
-     * @param _left The first value
-     * @param _right The second value
-     * @return The uint256 hash of _left and _right
-     */
-    function hashLeftRight(uint256 _left, uint256 _right) internal pure returns (uint256) {
-
-        // Solidity documentation states:
-        // `addmod(uint x, uint y, uint k) returns (uint)`:
-        // compute (x + y) % k where the addition is performed with arbitrary
-        // precision and does not wrap around at 2**256. Assert that k != 0
-        // starting from version 0.5.0.
-
-        uint256 R = _left;
-        uint256 C = 0;
-
-        (R, C) = MiMC.MiMCSponge(R, 0);
-
-        R = addmod(R, _right, SNARK_SCALAR_FIELD);
-        (R, C) = MiMC.MiMCSponge(R, C);
-
-        return R;
+    function hashLeftRight(uint256 _left, uint256 _right)
+        public
+        pure
+        returns (uint256)
+    {
+        uint256[2] memory input;
+        input[0] = _left;
+        input[1] = _right;
+        return PoseidonT3.poseidon(input);
     }
 }
