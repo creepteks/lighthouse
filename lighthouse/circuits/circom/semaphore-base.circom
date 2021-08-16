@@ -1,25 +1,11 @@
 include "../node_modules/circomlib/circuits/pedersen.circom";
-include "../node_modules/circomlib/circuits/mimcsponge.circom";
 include "../node_modules/circomlib/circuits/bitify.circom";
-include "../node_modules/circomlib/circuits/eddsamimcsponge.circom";
+include "../node_modules/circomlib/circuits/eddsaposeidon.circom";
 include "../node_modules/circomlib/circuits/babyjub.circom";
 include "../node_modules/circomlib/circuits/mux1.circom";
 include "../node_modules/circomlib/circuits/assert.circom";
 include "./blake2s/blake2s.circom";
-
-template HashLeftRight() {
-  signal input left;
-  signal input right;
-
-  signal output hash;
-
-  component hasher = MiMCSponge(2, 1);
-  left ==> hasher.ins[0];
-  right ==> hasher.ins[1];
-  hasher.k <== 0;
-
-  hash <== hasher.outs[0];
-}
+include "./poseidon/poseidonHasher.circom";
 
 template Selector() {
   signal input input_elem;
@@ -101,13 +87,17 @@ template CalculateIdentityCommitment(IDENTITY_PK_SIZE_IN_BITS, NULLIFIER_TRAPDOO
   out <== identity_commitment.out[0];
 }
 
-template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, n_levels) {
+template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_SIZE_IN_BITS, n_levels) {
+  signal input external_nullifier;
   signal input identity_nullifier[NULLIFIER_TRAPDOOR_SIZE_IN_BITS];
   signal input identity_path_index[n_levels];
 
   signal output nullifiers_hash;
 
-  var nullifiers_hasher_bits = NULLIFIER_TRAPDOOR_SIZE_IN_BITS + n_levels;
+  component external_nullifier_bits = Num2Bits(EXTERNAL_NULLIFIER_SIZE_IN_BITS);
+  external_nullifier_bits.in <== external_nullifier;
+
+  var nullifiers_hasher_bits = NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels;
   if (nullifiers_hasher_bits < 512) {
     nullifiers_hasher_bits = 512;
   }
@@ -118,11 +108,15 @@ template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, n_levels) {
     nullifiers_hasher.in_bits[i] <== identity_nullifier[i];
   }
 
-  for (var i = 0; i < n_levels; i++) {
-    nullifiers_hasher.in_bits[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + i] <== identity_path_index[i];
+  for (var i = 0; i < EXTERNAL_NULLIFIER_SIZE_IN_BITS; i++) {
+    nullifiers_hasher.in_bits[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + i] <== external_nullifier_bits.out[i];
   }
 
-  for (var i = (NULLIFIER_TRAPDOOR_SIZE_IN_BITS + n_levels); i < nullifiers_hasher_bits; i++) {
+  for (var i = 0; i < n_levels; i++) {
+    nullifiers_hasher.in_bits[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + i] <== identity_path_index[i];
+  }
+
+  for (var i = (NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels); i < nullifiers_hasher_bits; i++) {
     nullifiers_hasher.in_bits[i] <== 0;
   }
 
@@ -139,21 +133,22 @@ template Semaphore(n_levels) {
     // BEGIN signals
 
     signal input signal_hash;
+    signal input external_nullifier;
     
     signal private input fake_zero;
 
-    // mimc vector commitment
+    // poseidon vector commitment
     signal private input identity_pk[2];
     signal private input identity_nullifier;
     signal private input identity_trapdoor;
     signal private input identity_path_elements[n_levels];
     signal private input identity_path_index[n_levels];
 
-    // signature on (signal_hash) with identity_pk
+    // signature on (external nullifier, signal_hash) with identity_pk
     signal private input auth_sig_r[2];
     signal private input auth_sig_s;
 
-    // mimc hash
+    // poseidon hash
     signal output root;
     signal output nullifiers_hash;
 
@@ -163,6 +158,7 @@ template Semaphore(n_levels) {
 
     var IDENTITY_PK_SIZE_IN_BITS = 254;
     var NULLIFIER_TRAPDOOR_SIZE_IN_BITS = 248;
+    var EXTERNAL_NULLIFIER_SIZE_IN_BITS = 232;
 
     // END constants
 
@@ -218,7 +214,8 @@ template Semaphore(n_levels) {
     // END tree
 
     // BEGIN nullifiers
-    component nullifiers_hasher = CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, n_levels);
+    component nullifiers_hasher = CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_SIZE_IN_BITS, n_levels);
+    nullifiers_hasher.external_nullifier <== external_nullifier;
     for (var i = 0; i < NULLIFIER_TRAPDOOR_SIZE_IN_BITS; i++) {
       nullifiers_hasher.identity_nullifier[i] <== identity_nullifier_bits.out[i];
     }
@@ -229,18 +226,18 @@ template Semaphore(n_levels) {
     // END nullifiers
 
     // BEGIN verify sig
-    component msg_hasher = MiMCSponge(1, 1);
-    msg_hasher.ins[0] <== signal_hash;
-    msg_hasher.k <== 0;
+    component msg_hasher = HashLeftRight();
+    msg_hasher.left <== external_nullifier;
+    msg_hasher.right <== signal_hash;
 
-    component sig_verifier = EdDSAMiMCSpongeVerifier();
+    component sig_verifier = EdDSAPoseidonVerifier();
     (1 - fake_zero) ==> sig_verifier.enabled;
     identity_pk[0] ==> sig_verifier.Ax;
     identity_pk[1] ==> sig_verifier.Ay;
     auth_sig_r[0] ==> sig_verifier.R8x;
     auth_sig_r[1] ==> sig_verifier.R8y;
     auth_sig_s ==> sig_verifier.S;
-    msg_hasher.outs[0] ==> sig_verifier.M;
+    msg_hasher.hash ==> sig_verifier.M;
 
     // END verify sig
 }

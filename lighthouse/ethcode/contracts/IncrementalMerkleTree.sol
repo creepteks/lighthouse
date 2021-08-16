@@ -153,6 +153,12 @@ contract IncrementalMerkleTree is SnarkConstants {
         return currentIndex;
     }
 
+    /*
+     * hashes two `uint256` values (left and right) using Poseidon hash
+     * @param _left The first value
+     * @param _right The second value
+     * @return The uint256 hash of _left and _right
+     */
     function hashLeftRight(uint256 _left, uint256 _right)
         public
         pure
