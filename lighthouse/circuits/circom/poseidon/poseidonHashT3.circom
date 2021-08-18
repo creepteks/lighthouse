@@ -7,7 +7,7 @@ template PoseidonHashT3() {
     signal input inputs[nInputs];
     signal output out;
 
-    component hasher = Poseidon(nInputs, 3, 8, 57);
+    component hasher = Poseidon(nInputs);
     for (var i = 0; i < nInputs; i ++) {
         hasher.inputs[i] <== inputs[i];
     }

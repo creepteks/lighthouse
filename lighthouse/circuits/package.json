@@ -12,11 +12,11 @@
     "devDependencies": {
         "@types/jest": "^24.0.20",
         "@types/node": "^12.7.7",
-        "circom": "0.0.34",
-        "circomlib": "git+https://github.com/kobigurk/circomlib.git#4284dc1ef984a204db08864f5da530c97f9376ef",
+        "circom": "^0.5.45",
+        "circomlib": "^0.5.3",
         "jest": "^24.9.0",
         "module-alias": "^2.2.2",
-        "snarkjs": "https://github.com/weijiekoh/snarkjs.git#ef8bbbbe5a7d37f59cdb45d3fdf2c1dcf7dd9c7a",
+        "snarkjs": "^0.4.6",
         "ts-jest": "^24.1.0",
         "typescript": "^3.7.3",
         "websnark": "0.0.5"

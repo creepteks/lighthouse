@@ -3,9 +3,16 @@ include "../node_modules/circomlib/circuits/bitify.circom";
 include "../node_modules/circomlib/circuits/eddsaposeidon.circom";
 include "../node_modules/circomlib/circuits/babyjub.circom";
 include "../node_modules/circomlib/circuits/mux1.circom";
-include "../node_modules/circomlib/circuits/assert.circom";
+// include "../node_modules/circomlib/circuits/assert.circom";
 include "./blake2s/blake2s.circom";
 include "./poseidon/poseidonHasher.circom";
+
+function assert (condition) {
+  if (condition == 0) {
+    var x = 0;
+    x = x \ 0;
+  }
+}
 
 template Selector() {
   signal input input_elem;

@@ -27,8 +27,16 @@ if [ -f ./circuit.json ]; then
 else
     echo 'Generating circuit.json'
     export NODE_OPTIONS=--max-old-space-size=4096
-    npx circom ../circom/semaphore.circom
+    npx circom ../circom/semaphore.circom --r1cs --wasm --sym
+    snarkjs r1cs export json ../circom/semaphore.r1cs circuit.json
 fi
+
+# if [ -f ./powersOfTau28_hez_final_10.ptau]
+#     echo "Powers of Tau file exists. Skipping"
+# else 
+#     echo "Downloading Powers of Tau"
+#     wget https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_10.ptau
+
 
 if [ -f ./proving_key.json ]; then
     echo "proving_key.json already exists. Skipping."
@@ -45,6 +53,15 @@ else
     export NODE_OPTIONS=--max-old-space-size=4096
     node ../node_modules/websnark/tools/buildpkey.js -i ./proving_key.json -o ./proving_key.bin
 fi
+
+# if [ -f ./verification_key.json]
+#     echo "Verification key exists. Skipping"
+# else    
+#     npx snarkjs zkey new circuit.r1cs powersOfTau28_hez_final_10.ptau circuit_0000.zkey
+#     npx snarkjs zkey contribute circuit_0000.zkey circuit_final.zkey
+#     npx snarkjs zkey export verificationkey circuit_final.zkey verification_key.json
+#     npx snarkjs zkey verify circuit.r1cs powersOfTau28_hez_final_10.ptau circuit_final.zkey
+
 
 if [ -f ./verifier.sol ]; then
     echo 'verifier.sol already exists. Skipping.'

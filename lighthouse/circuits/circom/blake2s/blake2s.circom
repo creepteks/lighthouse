@@ -104,7 +104,7 @@ template Blake2sCompression(t, f) {
 
   signal output out_h[8][32];
 
-  var v_consts = [
+  var v_consts[8] = [
     0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19
   ];
   signal v_h[16][32];
@@ -168,7 +168,7 @@ template Blake2sCompression(t, f) {
     }
   }
 
-  var sigma = [
+  var sigma[10][16] = [
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
     [11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4],
@@ -182,9 +182,8 @@ template Blake2sCompression(t, f) {
   ];
 
   component mixing_g[10][8];
-  var s;
   for (var i = 0; i < 10; i++) {
-    s = sigma[i];
+    
     mixing_g[i][0] = MixingG(0, 4, 8, 12);
     for (var j = 0; j < 16; j++) {
       for (var k = 0; k < 32; k++) {
@@ -197,8 +196,8 @@ template Blake2sCompression(t, f) {
     }
 
     for (var k = 0; k < 32; k++) {
-      mixing_g[i][0].x[k] <== in_m[s[0]][k];
-      mixing_g[i][0].y[k] <== in_m[s[1]][k];
+      mixing_g[i][0].x[k] <== in_m[sigma[i][0]][k];
+      mixing_g[i][0].y[k] <== in_m[sigma[i][1]][k];
     }
 
 
@@ -207,8 +206,8 @@ template Blake2sCompression(t, f) {
       for (var j = 0; j < 16; j++) {
         mixing_g[i][1].in_v[j][k] <== mixing_g[i][0].out_v[j][k];
       }
-      mixing_g[i][1].x[k] <== in_m[s[2]][k];
-      mixing_g[i][1].y[k] <== in_m[s[3]][k];
+      mixing_g[i][1].x[k] <== in_m[sigma[i][2]][k];
+      mixing_g[i][1].y[k] <== in_m[sigma[i][3]][k];
     }
 
     mixing_g[i][2] = MixingG(2, 6, 10, 14);
@@ -216,8 +215,8 @@ template Blake2sCompression(t, f) {
       for (var j = 0; j < 16; j++) {
         mixing_g[i][2].in_v[j][k] <== mixing_g[i][1].out_v[j][k];
       }
-      mixing_g[i][2].x[k] <== in_m[s[4]][k];
-      mixing_g[i][2].y[k] <== in_m[s[5]][k];
+      mixing_g[i][2].x[k] <== in_m[sigma[i][4]][k];
+      mixing_g[i][2].y[k] <== in_m[sigma[i][5]][k];
     }
 
     mixing_g[i][3] = MixingG(3, 7, 11, 15);
@@ -225,8 +224,8 @@ template Blake2sCompression(t, f) {
       for (var j = 0; j < 16; j++) {
         mixing_g[i][3].in_v[j][k] <== mixing_g[i][2].out_v[j][k];
       }
-      mixing_g[i][3].x[k] <== in_m[s[6]][k];
-      mixing_g[i][3].y[k] <== in_m[s[7]][k];
+      mixing_g[i][3].x[k] <== in_m[sigma[i][6]][k];
+      mixing_g[i][3].y[k] <== in_m[sigma[i][7]][k];
     }
 
     mixing_g[i][4] = MixingG(0, 5, 10, 15);
@@ -234,8 +233,8 @@ template Blake2sCompression(t, f) {
       for (var j = 0; j < 16; j++) {
         mixing_g[i][4].in_v[j][k] <== mixing_g[i][3].out_v[j][k];
       }
-      mixing_g[i][4].x[k] <== in_m[s[8]][k];
-      mixing_g[i][4].y[k] <== in_m[s[9]][k];
+      mixing_g[i][4].x[k] <== in_m[sigma[i][8]][k];
+      mixing_g[i][4].y[k] <== in_m[sigma[i][9]][k];
     }
 
     mixing_g[i][5] = MixingG(1, 6, 11, 12);
@@ -243,8 +242,8 @@ template Blake2sCompression(t, f) {
       for (var j = 0; j < 16; j++) {
         mixing_g[i][5].in_v[j][k] <== mixing_g[i][4].out_v[j][k];
       }
-      mixing_g[i][5].x[k] <== in_m[s[10]][k];
-      mixing_g[i][5].y[k] <== in_m[s[11]][k];
+      mixing_g[i][5].x[k] <== in_m[sigma[i][10]][k];
+      mixing_g[i][5].y[k] <== in_m[sigma[i][11]][k];
     }
 
     mixing_g[i][6] = MixingG(2, 7, 8, 13);
@@ -252,8 +251,8 @@ template Blake2sCompression(t, f) {
       for (var j = 0; j < 16; j++) {
         mixing_g[i][6].in_v[j][k] <== mixing_g[i][5].out_v[j][k];
       }
-      mixing_g[i][6].x[k] <== in_m[s[12]][k];
-      mixing_g[i][6].y[k] <== in_m[s[13]][k];
+      mixing_g[i][6].x[k] <== in_m[sigma[i][12]][k];
+      mixing_g[i][6].y[k] <== in_m[sigma[i][13]][k];
     }
 
     mixing_g[i][7] = MixingG(3, 4, 9, 14);
@@ -261,8 +260,8 @@ template Blake2sCompression(t, f) {
       for (var j = 0; j < 16; j++) {
         mixing_g[i][7].in_v[j][k] <== mixing_g[i][6].out_v[j][k];
       }
-      mixing_g[i][7].x[k] <== in_m[s[14]][k];
-      mixing_g[i][7].y[k] <== in_m[s[15]][k];
+      mixing_g[i][7].x[k] <== in_m[sigma[i][14]][k];
+      mixing_g[i][7].y[k] <== in_m[sigma[i][15]][k];
     }
   }
 
@@ -296,7 +295,7 @@ template Blake2s(n_bits, personalization) {
   component h6_xor;
   component h7_xor;
 
-  var h_consts = [
+  var h_consts[8] = [
     0x6A09E667 ^ 0x01010000 ^ 32,
     0xBB67AE85,
     0x3C6EF372,
