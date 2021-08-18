@@ -50,7 +50,7 @@ contract IncrementalMerkleTree is SnarkConstants {
     // Whether the contract has already seen a particular Merkle tree root
     mapping (uint256 => bool) public rootHistory;
 
-    event LeafInsertion(uint256 indexed leaf, uint256 indexed leafIndex);
+    event LeafInsertion(uint256 indexed leaf, uint256 indexed leafIndex, uint256 currentRoot);
 
     /*
      * Stores the Merkle root and intermediate values (the Merkle path to the
@@ -148,7 +148,7 @@ contract IncrementalMerkleTree is SnarkConstants {
         uint256 n = nextLeafIndex;
         nextLeafIndex += 1;
 
-        emit LeafInsertion(_leaf, n);
+        emit LeafInsertion(_leaf, n, root);
 
         return currentIndex;
     }
