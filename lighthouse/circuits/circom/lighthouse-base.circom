@@ -1,3 +1,6 @@
+// refer to 
+// https://github.com/appliedzkp/semaphore/blob/master/circuits/circom/semaphore-base.circom
+
 include "../node_modules/circomlib/circuits/pedersen.circom";
 include "../node_modules/circomlib/circuits/bitify.circom";
 include "../node_modules/circomlib/circuits/eddsaposeidon.circom";
@@ -136,7 +139,7 @@ template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_
 }
 
 // n_levels must be < 32
-template Semaphore(n_levels) {
+template Lighthouse(n_levels) {
     // BEGIN signals
 
     signal input signal_hash;
