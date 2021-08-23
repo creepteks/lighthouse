@@ -50,7 +50,7 @@ if [ -f ./pot12_0001.ptau ]; then
     echo "first contribution is already added"
 else
     echo 'Generating pot12_0001.ptau (first contribution)'
-    npx snarkjs powersoftau contribute pot12_0000.ptau pot12_0001.ptau --name="First contribution" -v
+    npx snarkjs powersoftau contribute pot12_0000.ptau pot12_0001.ptau --name="First contribution" -v -e="Some random text"
 fi
 echo "---------------------"
 
@@ -59,7 +59,7 @@ if [ -f ./pot12_0002.ptau ]; then
     echo "second contribution is already done"
 else
     echo 'Generating pot12_0002.ptau (second contribution)'
-    npx snarkjs powersoftau contribute pot12_0001.ptau pot12_0002.ptau --name="Second contribution" -v -e="some random text"
+    npx snarkjs powersoftau contribute pot12_0001.ptau pot12_0002.ptau --name="Second contribution" -v -e="Another random text"
 fi
 echo "---------------------"
 
@@ -117,7 +117,7 @@ if [ -f ./verification_key.json ]; then
 else    
     echo "starting Groth16 setup phase"
     npx snarkjs groth16 setup lighthouse.r1cs pot12_final.ptau lighthouse_0000.zkey
-    npx snarkjs zkey contribute lighthouse_0000.zkey lighthouse_0001.zkey --name="1st Contributor Name" -v
+    npx snarkjs zkey contribute lighthouse_0000.zkey lighthouse_0001.zkey --name="1st Contributor Name" -v -e="Some random entropy"
     npx snarkjs zkey contribute lighthouse_0001.zkey lighthouse_0002.zkey --name="Second contribution Name" -v -e="Another random entropy"
     npx snarkjs zkey export bellman lighthouse_0002.zkey  challenge_phase2_0003
     npx snarkjs zkey bellman contribute bn128 challenge_phase2_0003 response_phase2_0003 -e="some random text"
