@@ -1,0 +1,21 @@
+{
+  "name": "lighthouse-client",
+  "version": "0.1.0",
+  "description": "Client algorithms for Lighthouse e-voting protocol",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "neo@crypteks",
+  "license": "MIT",
+  "dependencies": {
+    "circomlib": "^0.5.3",
+    "ethers": "^5.4.5",
+    "semaphore-merkle-tree": "git+https://github.com/creepteks/lighthouse-merkle-tree",
+    "snarkjs": "^0.4.6",
+    "websnark": "0.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^16.6.2"
+  }
+}
