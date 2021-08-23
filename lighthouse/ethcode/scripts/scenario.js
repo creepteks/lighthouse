@@ -8,7 +8,7 @@ const { expect } = require('chai');
 const fs = require('fs');
 
 // use truffle contract as opposed to truffle's artifacts.require or truffle test-env's contract.fromArtifacts
-const truffleContract = require("@truffle/contract");
+const truffleContract = require('../node_modules/@truffle/contract');
 var provider = new Web3.providers.HttpProvider("http://localhost:8545");
 
 // build MiMC contract from on-the-fly
@@ -45,36 +45,37 @@ const {
     parseVerifyingKeyJson,
     genBroadcastSignalParams,
     genSignalHash,
-} = require('libsemaphore')
+} = require('../../client/snarks/snarks_helpers')
 const path = require('path')
 const ethers = require('ethers')
+const snarkjs = require('snarkjs')
 
 const NUM_LEVELS = 20
 const FIRST_EXTERNAL_NULLIFIER = 0
 const SIGNAL = 'signal0'
 
-// Load circuit, proving key, and verifying key
-const circuitPath = path.join(__dirname, '../../circuits/build/circuit.json')
-const provingKeyPath = path.join(__dirname, '../../circuits/build/proving_key.bin')
-const verifyingKeyPath = path.join(__dirname, '../../circuits/build/verification_key.json')
-
-const cirDef = JSON.parse(fs.readFileSync(circuitPath).toString())
-const provingKey = fs.readFileSync(provingKeyPath)
-const verifyingKey = parseVerifyingKeyJson(fs.readFileSync(verifyingKeyPath).toString())
-const circuit = genCircuit(cirDef)
-
-
 let semaphoreContract
 let semaphoreClientContract
 let accounts
 let owner
+let wtns = {type: "mem"};
+let lighthouse_zkey_final = {type: "file"};
+let vKey;
+let proof
+let publicSignals
 // hex representations of all inserted identity commitments
 let insertedIdentityCommitments = []
 let identity
 let identityCommitment
-let proof
-let publicSignals
 let params
+
+// Load circuit and verifying key
+const lighthouse_circuit_path = path.join(__dirname, '../../circuits/build/lighthouse.wasm')
+lighthouse_zkey_final = path.join(__dirname, '../../circuits/build/lighthouse_final.zkey')
+const verifyingKeyPath = path.join(__dirname, '../../circuits/build/verification_key.json')
+
+vKey = parseVerifyingKeyJson(fs.readFileSync(verifyingKeyPath).toString())
+
 
 async function deploy() {
     // define the sender of the tx
@@ -104,19 +105,25 @@ async function deploy() {
     const leaves = await semaphoreClientContract.getIdentityCommitments()
 
     console.log("generating witness")
-    const result = await genWitness(
+    const wtns_result = await genWitness(
         SIGNAL,
-        circuit,
+        lighthouse_circuit_path,
         identity,
         leaves,
         NUM_LEVELS,
         FIRST_EXTERNAL_NULLIFIER,
     )
+    wtns = wtns_result.wtns
 
     console.log("generating proof and public params")
-    proof = await genProof(result.witness, provingKey)
-    publicSignals = genPublicSignals(result.witness, circuit)
-    params = genBroadcastSignalParams(result, proof, publicSignals)
+    proof_result = (await genProof(wtns, lighthouse_zkey_final)).res
+    // publicSignals = genPublicSignals(wtns_result.witness, circuit)
+    proof = proof_result.proof
+    publicSignals = proof_result.publicSignals
+    params = genBroadcastSignalParams(wtns_result, proof, publicSignals)
+
+    const res = await snarkjs.groth16.verify(vKey, publicSignals, proof);
+    console.log(res)
 
     // console.log("the identity used for witness ", identity)
     console.log("the inserted root: ", params.root)
