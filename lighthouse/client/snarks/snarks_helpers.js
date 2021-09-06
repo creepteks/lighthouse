@@ -8,8 +8,11 @@ const MemStorage = storage.MemStorage
 const MerkleTree = tree.MerkleTree
 const PoseidonHasher = hashers.PoseidonHasher
 const poseidon = circomlib.poseidon
-const { utils } = require('../node_modules/ffjavascript');
 const biginteger = require('../node_modules/big-integer')
+const shell = require('shelljs')
+const fs = require('fs')
+const path = require('path')
+const { utils } = require('../node_modules/ffjavascript');
 const {
     stringifyBigInts,
     unstringifyBigInts,
@@ -275,6 +278,19 @@ const _genWitness = async (
         externalNullifier,
         signalHash, 
     )
+    // var input = {
+    //     identity_pk: stringifyBigInts(identity.keypair.pubKey),
+    //     auth_sig_r: stringifyBigInts(signature.R8),
+    //     auth_sig_s: stringifyBigInts(signature.S),
+    //     signal_hash: stringifyBigInts(signalHash),
+    //     external_nullifier: stringifyBigInts(externalNullifier),
+    //     identity_nullifier: stringifyBigInts(identity.identityNullifier),
+    //     identity_trapdoor: stringifyBigInts(identity.identityTrapdoor),
+    //     identity_path_elements: identityPathElements,
+    //     identity_path_index: identityPathIndex,
+    //     fake_zero: stringifyBigInts(biginteger(0)),
+    // }
+    // fs.writeFileSync(path.join(__dirname, '../data/input.json'), JSON.stringify(input, null, 2))
     await snarkjs.wtns.calculate({
         identity_pk: identity.keypair.pubKey,
         // 'identity_pk[1]': identity.keypair.pubKey[1],zzz
@@ -289,6 +305,9 @@ const _genWitness = async (
         identity_path_index: identityPathIndex,
         // fake_zero: biginteger(0),
     }, circuit, wtns);
+
+    // shell.env['NODE_OPTIONS'] = '--max-old-space-size=16384'
+    // shell.exec(`node --max-old-space-size=16384 --stack-size=1073741 ../node_modules/snarkjs/cli.js groth16 fullprove ../data/input.json ../../circuits/build/lighthouse.wasm ../../circuits/build/lighthouse_final.zkey ../data/proof.json ../data/public.json`)
    
     return {
         wtns,
