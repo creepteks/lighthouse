@@ -29,9 +29,17 @@ else
     echo 'Generating lighthouse.wasm'
     export NODE_OPTIONS=--max-old-space-size=4096
     npx circom ../circom/lighthouse.circom --r1cs --wasm --sym
+    COMPILATION_RES=$?
     # npx snarkjs r1cs export json lighthouse.r1cs lighthouse.json
 fi
 echo "---------------------"
+
+if [ $COMPILATION_RES -eq 0 ]; then
+    echo "Successfully compiled lighthouse.circom"
+else
+    echo "Error while compiling. Aborting"
+    exit $COMPILATION_RES
+fi
 
 
 # start a new powers of tau ceremony
@@ -118,12 +126,13 @@ else
     echo "starting Groth16 setup phase"
     npx snarkjs groth16 setup lighthouse.r1cs pot12_final.ptau lighthouse_0000.zkey
     npx snarkjs zkey contribute lighthouse_0000.zkey lighthouse_0001.zkey --name="1st Contributor Name" -v -e="Some random entropy"
-    npx snarkjs zkey contribute lighthouse_0001.zkey lighthouse_0002.zkey --name="Second contribution Name" -v -e="Another random entropy"
-    npx snarkjs zkey export bellman lighthouse_0002.zkey  challenge_phase2_0003
-    npx snarkjs zkey bellman contribute bn128 challenge_phase2_0003 response_phase2_0003 -e="some random text"
-    npx snarkjs zkey import bellman lighthouse_0002.zkey response_phase2_0003 lighthouse_0003.zkey -n="Third contribution name"
-    npx snarkjs zkey verify lighthouse.r1cs pot12_final.ptau lighthouse_0003.zkey
-    npx snarkjs zkey beacon lighthouse_0003.zkey lighthouse_final.zkey 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 10 -n="Final Beacon phase2"
+    npx snarkjs zkey contribute lighthouse_0001.zkey lighthouse_final.zkey --name="Second contribution Name" -v -e="Another random entropy"
+    # npx snarkjs zkey contribute lighthouse_0001.zkey lighthouse_0002.zkey --name="Second contribution Name" -v -e="Another random entropy"
+    # npx snarkjs zkey export bellman lighthouse_0002.zkey  challenge_phase2_0003
+    # npx snarkjs zkey bellman contribute bn128 challenge_phase2_0003 response_phase2_0003 -e="some random text"
+    # npx snarkjs zkey import bellman lighthouse_0002.zkey response_phase2_0003 lighthouse_0003.zkey -n="Third contribution name"
+    # npx snarkjs zkey verify lighthouse.r1cs pot12_final.ptau lighthouse_0003.zkey
+    # npx snarkjs zkey beacon lighthouse_0003.zkey lighthouse_final.zkey 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 10 -n="Final Beacon phase2"
     npx snarkjs zkey verify lighthouse.r1cs pot12_final.ptau lighthouse_final.zkey
     npx snarkjs zkey export verificationkey lighthouse_final.zkey verification_key.json
 fi
