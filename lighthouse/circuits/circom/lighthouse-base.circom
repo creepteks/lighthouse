@@ -5,68 +5,14 @@ include "../node_modules/circomlib/circuits/pedersen.circom";
 include "../node_modules/circomlib/circuits/bitify.circom";
 include "../node_modules/circomlib/circuits/eddsaposeidon.circom";
 include "../node_modules/circomlib/circuits/babyjub.circom";
-include "../node_modules/circomlib/circuits/mux1.circom";
-// include "../node_modules/circomlib/circuits/assert.circom";
-include "./blake2s/blake2s.circom";
 include "./poseidon/poseidonHasher.circom";
+include "./IncrementalMerkleTree.circom";
 
 function assert (condition) {
   if (condition == 0) {
     var x = 0;
     x = x \ 0;
   }
-}
-
-template Selector() {
-  signal input input_elem;
-  signal input path_elem;
-  signal input path_index;
-
-  signal output left;
-  signal output right;
-
-  path_index * (1-path_index) === 0
-
-  component mux = MultiMux1(2);
-  mux.c[0][0] <== input_elem;
-  mux.c[0][1] <== path_elem;
-
-  mux.c[1][0] <== path_elem;
-  mux.c[1][1] <== input_elem;
-
-  mux.s <== path_index;
-
-  left <== mux.out[0];
-  right <== mux.out[1];
-}
-
-template MerkleTreeInclusionProof(n_levels) {
-    signal input identity_commitment;
-    signal input identity_path_index[n_levels];
-    signal input identity_path_elements[n_levels];
-    signal output root;
-
-    component selectors[n_levels];
-    component hashers[n_levels];
-
-    for (var i = 0; i < n_levels; i++) {
-      selectors[i] = Selector();
-      hashers[i] = HashLeftRight();
-
-      identity_path_index[i] ==> selectors[i].path_index;
-      identity_path_elements[i] ==> selectors[i].path_elem;
-
-      selectors[i].left ==> hashers[i].left;
-      selectors[i].right ==> hashers[i].right;
-    }
-
-    identity_commitment ==> selectors[0].input_elem;
-
-    for (var i = 1; i < n_levels; i++) {
-      hashers[i-1].hash ==> selectors[i].input_elem;
-    }
-
-    root <== hashers[n_levels - 1].hash;
 }
 
 template CalculateIdentityCommitment(IDENTITY_PK_SIZE_IN_BITS, NULLIFIER_TRAPDOOR_SIZE_IN_BITS) {
@@ -108,34 +54,28 @@ template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_
   external_nullifier_bits.in <== external_nullifier;
 
   var nullifiers_hasher_bits = NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels;
-  if (nullifiers_hasher_bits < 512) {
-    nullifiers_hasher_bits = 512;
+  if (nullifiers_hasher_bits < 530) {
+    nullifiers_hasher_bits = 530;
   }
-  assert (nullifiers_hasher_bits <= 512);
 
-  component nullifiers_hasher = Blake2s(nullifiers_hasher_bits, 0);
+  component nullifiers_hasher = Pedersen(nullifiers_hasher_bits);
   for (var i = 0; i < NULLIFIER_TRAPDOOR_SIZE_IN_BITS; i++) {
-    nullifiers_hasher.in_bits[i] <== identity_nullifier[i];
+    nullifiers_hasher.in[i] <== identity_nullifier[i];
   }
 
   for (var i = 0; i < EXTERNAL_NULLIFIER_SIZE_IN_BITS; i++) {
-    nullifiers_hasher.in_bits[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + i] <== external_nullifier_bits.out[i];
+    nullifiers_hasher.in[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + i] <== external_nullifier_bits.out[i];
   }
 
   for (var i = 0; i < n_levels; i++) {
-    nullifiers_hasher.in_bits[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + i] <== identity_path_index[i];
+    nullifiers_hasher.in[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + i] <== identity_path_index[i];
   }
 
   for (var i = (NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels); i < nullifiers_hasher_bits; i++) {
-    nullifiers_hasher.in_bits[i] <== 0;
+    nullifiers_hasher.in[i] <== 0;
   }
 
-  component nullifiers_hash_num = Bits2Num(250);
-  for (var i = 0; i < 250; i++) {
-    nullifiers_hash_num.in[i] <== nullifiers_hasher.out[i];
-  }
-
-  nullifiers_hash <== nullifiers_hash_num.out;
+  nullifiers_hash <== nullifiers_hasher.out[0];
 }
 
 // n_levels must be < 32
@@ -161,14 +101,13 @@ template Lighthouse(n_levels) {
     // poseidon hash
     signal output root;
     signal output nullifiers_hash;
-
     // END signals
 
     // BEGIN constants
 
     var IDENTITY_PK_SIZE_IN_BITS = 254;
-    var NULLIFIER_TRAPDOOR_SIZE_IN_BITS = 248;
-    var EXTERNAL_NULLIFIER_SIZE_IN_BITS = 232;
+    var NULLIFIER_TRAPDOOR_SIZE_IN_BITS = 254;
+    var EXTERNAL_NULLIFIER_SIZE_IN_BITS = 254;
 
     // END constants
 
@@ -182,17 +121,6 @@ template Lighthouse(n_levels) {
     verify_auth_sig_r_on_curve.x <== auth_sig_r[0];
     verify_auth_sig_r_on_curve.y <== auth_sig_r[1];
 
-    // get a prime subgroup element derived from identity_pk
-    component dbl1 = BabyDbl();
-    dbl1.x <== identity_pk[0];
-    dbl1.y <== identity_pk[1];
-    component dbl2 = BabyDbl();
-    dbl2.x <== dbl1.xout;
-    dbl2.y <== dbl1.yout;
-    component dbl3 = BabyDbl();
-    dbl3.x <== dbl2.xout;
-    dbl3.y <== dbl2.yout;
-
     component identity_nullifier_bits = Num2Bits(NULLIFIER_TRAPDOOR_SIZE_IN_BITS);
     identity_nullifier_bits.in <== identity_nullifier;
 
@@ -200,7 +128,7 @@ template Lighthouse(n_levels) {
     identity_trapdoor_bits.in <== identity_trapdoor;
 
     component identity_pk_0_bits = Num2Bits_strict();
-    identity_pk_0_bits.in <== dbl3.xout;
+    identity_pk_0_bits.in <== identity_pk[0];
 
     // BEGIN identity commitment
     component identity_commitment = CalculateIdentityCommitment(IDENTITY_PK_SIZE_IN_BITS, NULLIFIER_TRAPDOOR_SIZE_IN_BITS);
@@ -215,10 +143,10 @@ template Lighthouse(n_levels) {
 
     // BEGIN tree
     component tree = MerkleTreeInclusionProof(n_levels);
-    tree.identity_commitment <== identity_commitment.out;
+    tree.leaf <== identity_commitment.out;
     for (var i = 0; i < n_levels; i++) {
-      tree.identity_path_index[i] <== identity_path_index[i];
-      tree.identity_path_elements[i] <== identity_path_elements[i];
+      tree.path_index[i] <== identity_path_index[i];
+      tree.path_elements[i][0] <== identity_path_elements[i];
     }
     root <== tree.root;
     // END tree

@@ -25,6 +25,7 @@ cd ../build
 echo "---------------------"
 if [ -f ./lighthouse.wasm ]; then
     echo "lighthouse.wasm already exists. Skipping."
+    exit 0
 else
     echo 'Generating lighthouse.wasm'
     export NODE_OPTIONS=--max-old-space-size=4096
