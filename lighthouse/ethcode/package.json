@@ -1,10 +1,11 @@
 {
-  "name": "lighthouse-ethereum-contracts",
+  "name": "lighthouse-ethcode",
   "version": "0.0.0",
   "description": "Solidity contracts which create the backbone of lighthouse protocol",
   "main": "truffle-config.js",
   "scripts": {
-    "test": "mocha --exit --recursive"
+    "test": "mocha --exit --recursive &&",
+    "build": "npx truffle compile"
   },
   "keywords": [
     "lighthouse",
@@ -17,13 +18,24 @@
     "@openzeppelin/contracts": "^3.3.0",
     "@openzeppelin/test-environment": "^0.1.9",
     "@openzeppelin/test-helpers": "^0.5.10",
+    "@openzeppelin/truffle-upgrades": "^1.8.0",
+    "@truffle/artifactor": "^4.0.115",
     "chai": "^4.2.0",
-    "ganache-cli": "^6.12.1",
+    "circomlib": "^0.5.3",
+    "etherlime": "^2.2.4",
+    "etherlime-lib": "^1.1.5",
+    "ganache-cli": "^6.12.2",
     "mocha": "^8.2.1",
-    "truffle": "^5.1.60"
+    "snarkjs": "^0.4.6",
+    "truffle": "5.1.29",
+    "web3": "^1.5.1"
   },
   "directories": {
     "test": "test"
   },
-  "dependencies": {}
+  "dependencies": {
+    "ethers": "^4.0.38",
+    "shelljs": "^0.8.4",
+    "web3-eth-accounts": "^1.2.2"
+  }
 }

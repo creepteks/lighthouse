@@ -1,0 +1,7 @@
+{
+  "packages": [
+    "lighthouse/ethcode",
+    "lighthouse/circuits"
+  ],
+  "version": "0.0.0"
+}
