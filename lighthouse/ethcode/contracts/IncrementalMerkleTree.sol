@@ -19,7 +19,7 @@
  * along with Semaphore.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pragma solidity ^0.5.0;
+pragma solidity ^0.6.11;
 
 import { SnarkConstants } from "./SnarkConstants.sol";
 import {PoseidonT3} from "./Poseidon.sol";

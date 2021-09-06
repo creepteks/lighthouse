@@ -19,7 +19,7 @@
  * along with Semaphore.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pragma solidity ^0.5.0;
+pragma solidity ^0.6.11;
 
 import "./verifier.sol";
 import { IncrementalMerkleTree } from "./IncrementalMerkleTree.sol";
@@ -50,10 +50,13 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
 
     // Whether broadcastSignal() can only be called by the owner of this
     // contract. This is the case as a safe default.
-    bool public isBroadcastPermissioned = true;
+    bool public isBroadcastPermissioned = false;
 
     // Whether the contract has already seen a particular nullifier hash
     mapping (uint256 => bool) public nullifierHashHistory;
+
+    // inserted commitments as leafs in the merkle tree
+    uint256[] public identityCommitments;
 
     event PermissionSet(bool indexed newPermission);
     event ExternalNullifierAdd(uint232 indexed externalNullifier);
@@ -71,7 +74,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
     // not have its preimage and therefore cannot spend funds they do not own.
 
     uint256 public NOTHING_UP_MY_SLEEVE_ZERO = 
-        uint256(keccak256(abi.encodePacked('Semaphore'))) % SNARK_SCALAR_FIELD;
+        uint256(keccak256(abi.encodePacked('Maci'))) % SNARK_SCALAR_FIELD;
 
     /*
      * If broadcastSignal is permissioned, check if msg.sender is the contract
@@ -92,9 +95,16 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
      */
     constructor(uint8 _treeLevels, uint232 _firstExternalNullifier)
         IncrementalMerkleTree(_treeLevels, NOTHING_UP_MY_SLEEVE_ZERO)
-        Ownable()
         public {
             addEn(_firstExternalNullifier, true);
+    }
+
+    function getIdentityCommitments() public view returns (uint256 [] memory) {
+        return identityCommitments;
+    }
+
+    function getIdentityCommitment(uint256 _index) public view returns (uint256) {
+        return identityCommitments[_index];
     }
 
     /*
@@ -113,7 +123,10 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             "Semaphore: identity commitment cannot be the nothing-up-my-sleeve-value"
         );
 
-        return insertLeaf(_identityCommitment);
+        uint256 insertionIndex = insertLeaf(_identityCommitment);
+        identityCommitments.push(_identityCommitment);
+
+        return insertionIndex + 4;
     }
 
     /*

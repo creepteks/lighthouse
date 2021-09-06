@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.5.0;
+pragma solidity ^0.6.11;
 
 import "./libs/zok_verifier.sol";
 import "./libs/byteutils.sol";
