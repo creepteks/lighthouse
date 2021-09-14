@@ -21,11 +21,11 @@
 
 pragma solidity ^0.6.11;
 
-import "./verifier.sol";
+import "./lighthouseVerifier.sol";
 import { IncrementalMerkleTree } from "./IncrementalMerkleTree.sol";
 import "./Ownable.sol";
 
-contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
+contract Semaphore is LighthouseVerifier, IncrementalMerkleTree, Ownable {
     // The external nullifier helps to prevent double-signalling by the same
     // user. An external nullifier can be active or deactivated.
 
@@ -126,7 +126,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
         uint256 insertionIndex = insertLeaf(_identityCommitment);
         identityCommitments.push(_identityCommitment);
 
-        return insertionIndex + 4;
+        return insertionIndex;
     }
 
     /*
@@ -253,7 +253,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             areAllValidFieldElements(_proof) &&
             _root < SNARK_SCALAR_FIELD &&
             _nullifiersHash < SNARK_SCALAR_FIELD &&
-            verifyProof(a, b, c, publicSignals);
+            verifyLighthouseProof(a, b, c, publicSignals);
     }
 
     /*
@@ -310,7 +310,7 @@ contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
             unpackProof(_proof);
 
         require(
-            verifyProof(a, b, c, publicSignals),
+            verifyLighthouseProof(a, b, c, publicSignals),
             "Semaphore: invalid proof"
         );
 

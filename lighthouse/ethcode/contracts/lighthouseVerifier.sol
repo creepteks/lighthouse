@@ -161,7 +161,7 @@ library Pairing {
         return pairing(p1, p2);
     }
 }
-contract Verifier {
+contract LighthouseVerifier {
     using Pairing for *;
     struct VerifyingKey {
         Pairing.G1Point alfa1;
@@ -175,7 +175,7 @@ contract Verifier {
         Pairing.G2Point B;
         Pairing.G1Point C;
     }
-    function verifyingKey() internal pure returns (VerifyingKey memory vk) {
+    function lighthouseVerifyingKey() internal pure returns (VerifyingKey memory vk) {
         vk.alfa1 = Pairing.G1Point(
             9174716208775354538826014729452063775317890986763841049404153188663102423424,
             16243803528191381215430608400037602221653489795482651152156623344096352865000
@@ -194,10 +194,10 @@ contract Verifier {
              8495653923123431417604973247489272438418190587263600148770280649306958101930]
         );
         vk.delta2 = Pairing.G2Point(
-            [10646659331248263981616480369606855906357215106304680668435313347523904281422,
-             15763916845398761848220260574311912227675654018729839170718807711732270096560],
-            [20622214696623944740117436696902463290229781817520259406912483383452833747049,
-             11069250552314883128072263335732014730440965524079304968988408674196227923594]
+            [17431759970565574412713670269406150410964216402407635809352019221112908350812,
+             16009955343280311501984690314241369160591699989838259397938243183001973823372],
+            [313531358667885789280246808260622022572190061055759939325758029216688101447,
+             17307832435756540464125212485929190502768399714475241604325585741278342025624]
         );
         vk.IC = new Pairing.G1Point[](5);
         
@@ -227,9 +227,9 @@ contract Verifier {
         );                                      
         
     }
-    function verify(uint[] memory input, Proof memory proof) internal view returns (uint) {
+    function verify(VerifyingKey memory vk, uint[] memory input, Proof memory proof) internal view returns (uint) {
         uint256 snark_scalar_field = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-        VerifyingKey memory vk = verifyingKey();
+        // VerifyingKey memory vk = verifyingKey();
         require(input.length + 1 == vk.IC.length,"verifier-bad-input");
         // Compute the linear combination vk_x
         Pairing.G1Point memory vk_x = Pairing.G1Point(0, 0);
@@ -247,7 +247,7 @@ contract Verifier {
         return 0;
     }
     /// @return r  bool true if proof is valid
-    function verifyProof(
+    function verifyLighthouseProof(
             uint[2] memory a,
             uint[2][2] memory b,
             uint[2] memory c,
@@ -261,7 +261,7 @@ contract Verifier {
         for(uint i = 0; i < input.length; i++){
             inputValues[i] = input[i];
         }
-        if (verify(inputValues, proof) == 0) {
+        if (verify(lighthouseVerifyingKey(), inputValues, proof) == 0) {
             return true;
         } else {
             return false;
