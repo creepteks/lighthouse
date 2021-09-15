@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.11;
 
-import "./libs/byteutils.sol";
+// import "./libs/byteutils.sol";
+import "./EdDSA.sol";
 import "./Semaphore.sol";
 import "./eddsaVerifier.sol";
 
@@ -13,8 +14,20 @@ contract beacon is Semaphore, Verifier {
         public {
     }
 
-    function registerVoter(uint256 _identityCommitment) public returns (uint256) {
-        return insertIdentity(_identityCommitment);
+    function registerVoter(
+        uint[2] memory a,
+        uint[2][2] memory b,
+        uint[2] memory c,
+        uint[7] memory input
+    ) public returns (uint256) {
+        // TODO check if the registrar pubkey is valid 
+        // require(registrar[input[0]], "Unknown Registrar; Aborting Registration phase");
+        
+        // checking eddsa proof of knowledge
+        require(verifyEddsaProof(a, b, c, input), "eddsa proof is not valid");
+
+        // inserting the identity commitment in the accumulator
+        return insertIdentity(input[0]);
     }
 
     function vote(
