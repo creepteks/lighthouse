@@ -80,6 +80,9 @@ const lighthouse_circuit_path = path.join(__dirname, '../../../circuits/build/li
 const lighthouse_zkey_final = path.join(__dirname, '../../../circuits/build/lighthouse_final.zkey')
 const verifyingKeyPath = path.join(__dirname, '../../../circuits/build/verification_key.json')
 
+const eddsa_circuit_path = path.join(__dirname, '../../../circuits/build/eddsaVerifier.wasm')
+const eddsa_zkey_final = path.join(__dirname, '../../../circuits/build/eddsaVerifier_final.zkey')
+const eddsaVerifyingKeyPath = path.join(__dirname, '../../../circuits/build/eddsaVerification_key.json')
 
 
 const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
@@ -88,26 +91,56 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     owner = web3.eth.accounts.privateKeyToAccount("0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6");
     accounts = await web3.eth.getAccounts()
 
+   // PHASE 00 VOTER: CREATING IDENTITY
     const identity = genIdentity();
     const identityCommitment = genIdentityCommitment(identity);
 
-    console.log("inserting ", identityCommitment.toString())
+    // PHASE 01 REGISTRATION
+    // the registrar signs the commitment
+    const { privKey, pubKey } = genKeypair();
+    const { signature, msg } = genSignedMsg(
+        privKey,
+        identityCommitment,
+        0, 
+    )
 
-    // todo : fix for odd-length arrays, not every time
-    var sigbyte = []
-    sigbyte.push(0)
+    // voter calculates the proof of knowledge to show valid signature by registrar PK
+    const { proof, publicSignals } = await genEddsaProof(
+        identityCommitment, 
+        pubKey,
+        signature,
+        eddsa_circuit_path,
+        eddsa_zkey_final
+    )
+    edvKey = parseVerifyingKeyJson(fs.readFileSync(eddsaVerifyingKeyPath).toString())
+    const res = await snarkjs.groth16.verify(edvKey, publicSignals, proof);
+    console.log("eddsa proof verification result: ", res)
+    
+    // voter (or someone on behalf of it) makes a registerVoter tx
+    var regParams = genRegisterVoterParams(proof, publicSignals)
+    var regTx = semaphoreInstance.methods.registerVoter(regParams.a, regParams.b, regParams.c, regParams.input)
+    var regReceipt = await send(web3, owner, regTx)
+    console.log("voter registered: ", regReceipt.status)
+
+
+    console.log("inserting ", identityCommitment.toString())
+    // insertedIdentityCommitments.push('0x' + identityCommitment.toString(16))
+    insertedIdentityCommitments.push(identityCommitment)
+
+    // this fixes the `param.substring() is not a function` bug
+    // in ABICoder.prototype.formatParam in web3.eth.abi
     var sig = ethers.utils.toUtf8Bytes(SIGNAL)
+    var sigbyte = []
+    if (sig.length % 2 != 0) {
+        sigbyte.push(0)
+    }
     for (let i = 0; i < sig.length; i++) {
         sigbyte.push(sig[i]);
     }
 
-    var tx = semaphoreInstance.methods.insertIdentity(identityCommitment.toString())
-    var receipt = await send(web3, owner, tx)
-    // insertedIdentityCommitments.push('0x' + identityCommitment.toString(16))
-    insertedIdentityCommitments.push(identityCommitment)
     semaphoreInstance.methods.getIdentityCommitments().call({ from: accounts[0] }, async function(err, leaves){
         console.log("generating proof")
-        proof_res = await genProof(
+        proof_res = await genLighthouseProof(
             sigbyte,
             lighthouse_circuit_path,
             identity,
@@ -137,6 +170,15 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
         )
         var receipt = await send(web3, owner, tx)
         console.log("voted ", receipt.status)
+
+        // do the tally
+        // let contractAddress = semaphoreInstance.options.address
+        // let indexExists = true
+        // let index = 0
+        // while (indexExists) {
+        //     console.log(`[${index}]` + await web3.eth.getStorageAt(contractAddress, index))
+        //     index++
+        // }
     });
 }
 
@@ -216,7 +258,7 @@ const genIdentityCommitment = (
     ])
 }
 
-const genProof = async (
+const genLighthouseProof = async (
     signal,
     circuit,
     identity,
@@ -229,7 +271,7 @@ const genProof = async (
     // convert idCommitments
     const idCommitmentsAsBigInts = []
     for (let idc of idCommitments) {
-        idCommitmentsAsBigInts.push(stringifyBigInts(biginteger(idc.toString())))
+        idCommitmentsAsBigInts.push(idc.toString())
     }
 
     const identityCommitment = genIdentityCommitment(identity)
@@ -296,6 +338,28 @@ const genProof = async (
     }
 }
 
+const genEddsaProof = async (
+    identityCommitment,
+    signerPubkey,
+    signature,
+    circuit_path,
+    zkey_final
+) => {
+
+    const {proof, publicSignals} = await snarkjs.groth16.fullProve({
+        signer_pk: signerPubkey,
+        identity_commitment: identityCommitment,
+        auth_sig_r: signature.R8,
+        auth_sig_s: signature.S,
+    }, circuit_path, zkey_final);
+
+    return {
+        proof, 
+        publicSignals
+    }
+}
+
+
 const pedersenHash = (ints) => {
 
     const p = circomlib.babyJub.unpackPoint(
@@ -325,13 +389,13 @@ const keccak256HexToBigInt = (
 
 const genSignedMsg = (
     privKey,
-    externalNullifier,
-    signalHash,
+    lhs,
+    rhs,
 ) => {
     const hasher = poseidonHasher
     const msg = hasher([
-        externalNullifier,
-        signalHash,
+        lhs,
+        rhs,
     ])
 
     return {
@@ -363,6 +427,25 @@ const formatForVerifierContract = (
         c: [ proof.pi_c[0].toString(), proof.pi_c[1].toString() ],
         input: publicSignals.map(stringify),
     }
+}
+
+const genRegisterVoterParams = (
+    proof,
+    publicSignals,
+) => {
+    return formatForVerifierContract(proof, publicSignals)
+    // const formatted = formatForVerifierContract(proof, publicSignals)
+    // return {
+    //     proof: [
+    //         formatted.a,
+    //         formatted.b[0],
+    //         formatted.b[1],
+    //         formatted.c,
+    //     ],
+    //     signerPubkey: formatted.input[0],
+    //     identityCommitment: formatted.input[2]
+    // }
+
 }
 
 const genBroadcastSignalParams = (

@@ -48,8 +48,8 @@ async function deploySemaphore(deployClientContract){
     console.log("using poseidon addr: ", poseidonInstance.options.address) // instance with the new contract address
     
     // use solc linker to link the Poseidon address to Semaphore bytecode
-    var semAbiPath = path.resolve(__dirname, '../../build/Semaphore.abi')
-    var semBinPath = path.resolve(__dirname, '../../build/Semaphore.bin')
+    var semAbiPath = path.resolve(__dirname, '../../build/beacon.abi')
+    var semBinPath = path.resolve(__dirname, '../../build/beacon.bin')
     shell.exec(`solc --link `
         + semBinPath
         + ` --libraries contracts/Poseidon.sol:PoseidonT3:`
