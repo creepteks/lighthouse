@@ -4,9 +4,9 @@ pragma solidity ^0.6.11;
 // import "./libs/byteutils.sol";
 import "./EdDSA.sol";
 import "./Semaphore.sol";
-import "./eddsaVerifier.sol";
+// import "./eddsaVerifier.sol";
 
-contract beacon is Semaphore, Verifier {
+contract beacon is Semaphore, EdDSA {
     mapping(uint256 => uint256) public beacons;
 
     constructor(uint8 _treeLevels, uint232 _randomBeaconNullifier)
@@ -14,20 +14,29 @@ contract beacon is Semaphore, Verifier {
         public {
     }
 
-    function registerVoter(
-        uint[2] memory a,
-        uint[2][2] memory b,
-        uint[2] memory c,
-        uint[7] memory input
-    ) public returns (uint256) {
+    // function registerVoter(
+    //     uint[2] memory a,
+    //     uint[2][2] memory b,
+    //     uint[2] memory c,
+    //     uint[7] memory input
+    // ) public returns (uint256) {
+    //     // TODO check if the registrar pubkey is valid 
+    //     // require(registrar[input[0]], "Unknown Registrar; Aborting Registration phase");
+    //     // checking eddsa proof of knowledge
+    //     require(verifyEddsaProof(a, b, c, input), "eddsa proof is not valid");
+
+    //     // inserting the identity commitment in the accumulator
+    //     return insertIdentity(input[0]);
+    // }
+
+    function registerVoter(uint256[2] memory pubkey, uint256 hashed_msg, uint256[2] memory R8, uint256 s) public returns (uint256) {
         // TODO check if the registrar pubkey is valid 
         // require(registrar[input[0]], "Unknown Registrar; Aborting Registration phase");
-        
-        // checking eddsa proof of knowledge
-        require(verifyEddsaProof(a, b, c, input), "eddsa proof is not valid");
+        require(VerifyPoseidon(pubkey, hashed_msg, R8, s), "EdDSA signature is not valid");
+
 
         // inserting the identity commitment in the accumulator
-        return insertIdentity(input[0]);
+        return insertIdentity(hashed_msg);
     }
 
     function vote(

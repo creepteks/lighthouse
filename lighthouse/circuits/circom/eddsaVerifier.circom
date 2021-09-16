@@ -9,7 +9,9 @@ template eddsaVerifier() {
     signal input identity_commitment;
     signal input auth_sig_r[2];
     signal input auth_sig_s;
-
+    signal output commitment;
+    
+    identity_commitment ==> commitment;
     component hasher = HashLeftRight();
     hasher.left <== identity_commitment;
     hasher.right <== 0;

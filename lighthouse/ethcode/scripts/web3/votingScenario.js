@@ -41,7 +41,7 @@ const {
     unpackPubKey,
 } = require('../../../client/node_modules/maci-crypto')
 
-const { utils } = require('../../../client/node_modules/ffjavascript');
+const { utils, Scalar } = require('../../../client/node_modules/ffjavascript');
 const {
     // stringifyBigInts,
     // unstringifyBigInts,
@@ -104,23 +104,35 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
         0, 
     )
 
-    // voter calculates the proof of knowledge to show valid signature by registrar PK
-    const { proof, publicSignals } = await genEddsaProof(
-        identityCommitment, 
-        pubKey,
-        signature,
-        eddsa_circuit_path,
-        eddsa_zkey_final
+    var regTx = semaphoreInstance.methods.registerVoter(
+        [pubKey[0].toString(), pubKey[1].toString()],
+        msg.toString(),
+        [signature.R8[0].toString(), signature.R8[1].toString()],
+        signature.S.toString()
     )
-    edvKey = parseVerifyingKeyJson(fs.readFileSync(eddsaVerifyingKeyPath).toString())
-    const res = await snarkjs.groth16.verify(edvKey, publicSignals, proof);
-    console.log("eddsa proof verification result: ", res)
+    var regVoterReceipt = await send(web3, owner, regTx);
+    console.log("registered voter ", regVoterReceipt.status);
+
+
+    // // voter calculates the proof of knowledge to show valid signature by registrar PK
+    // const { proof, publicSignals } = await genEddsaProof(
+    //     identityCommitment, 
+    //     pubKey,
+    //     signature,
+    //     eddsa_circuit_path,
+    //     eddsa_zkey_final
+    // )
+    // edvKey = parseVerifyingKeyJson(fs.readFileSync(eddsaVerifyingKeyPath).toString())
+    // const res = await snarkjs.groth16.verify(edvKey, publicSignals, proof);
+    // console.log("eddsa proof verification result: ", res)
     
-    // voter (or someone on behalf of it) makes a registerVoter tx
-    var regParams = genRegisterVoterParams(proof, publicSignals)
-    var regTx = semaphoreInstance.methods.registerVoter(regParams.a, regParams.b, regParams.c, regParams.input)
-    var regReceipt = await send(web3, owner, regTx)
-    console.log("voter registered: ", regReceipt.status)
+    // // voter (or someone on behalf of it) makes a registerVoter tx
+    // var regParams = genRegisterVoterParams(proof, publicSignals)
+    // var regTx = semaphoreInstance.methods.registerVoter(regParams.a, regParams.b, regParams.c, regParams.input)
+    // var regReceipt = await send(web3, owner, regTx)
+    // console.log("voter registered: ", regReceipt.status)
+
+
 
 
     console.log("inserting ", identityCommitment.toString())
@@ -472,3 +484,14 @@ const genBroadcastSignalParams = (
 }
 
 startScenario()
+
+function test() {
+    // params of baby jubjub
+    const order = Scalar.fromString("21888242871839275222246405745257275088614511777268538073601725287587578984328");
+    const subOrder = Scalar.shiftRight(order, 3);
+     
+    console.log(stringifyBigInts(order))
+    console.log(stringifyBigInts(subOrder))
+}
+
+// test()
