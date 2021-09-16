@@ -69,8 +69,8 @@ async function startDeployment(deployMainContract) {
     } );
 
     // creating the CurveBabyJubjub contract by compilation
-    var babyjubAbi = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../build/CurveBabyJubJub.abi'), 'utf-8').toString())
-    var babyjubBin = fs.readFileSync(path.resolve(__dirname, '../../build/CurveBabyJubJub.bin'), 'utf-8').toString()
+    var babyjubAbi = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../build/JubJub.abi'), 'utf-8').toString())
+    var babyjubBin = fs.readFileSync(path.resolve(__dirname, '../../build/JubJub.bin'), 'utf-8').toString()
     var babyJubContract = new ethcontract(babyjubAbi)
     owner = (await web3.eth.getAccounts())[0]
     babyJubContract.deploy({data: babyjubBin})
@@ -106,7 +106,9 @@ async function deploySemaphore(deployClientContract){
         + ` --libraries contracts/Poseidon.sol:PoseidonT3:`
         + poseidonT3Instance.options.address
         + ` --libraries contracts/Poseidon.sol:PoseidonT6:`
-        + poseidonT6Instance.options.address)
+        + poseidonT6Instance.options.address
+        + ` --libraries contracts/JubJub.sol:JubJub:`
+        + babyJubjubInstance.options.address);
 
     var semAbi = JSON.parse(fs.readFileSync(semAbiPath, 'utf-8').toString())
     var semBin = fs.readFileSync(semBinPath, 'utf-8').toString()

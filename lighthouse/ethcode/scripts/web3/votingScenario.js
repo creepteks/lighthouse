@@ -105,8 +105,9 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     )
 
     var regTx = semaphoreInstance.methods.registerVoter(
-        [pubKey[0].toString(), pubKey[1].toString()],
+        identityCommitment.toString(),
         msg.toString(),
+        [pubKey[0].toString(), pubKey[1].toString()],
         [signature.R8[0].toString(), signature.R8[1].toString()],
         signature.S.toString()
     )

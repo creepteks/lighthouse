@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.11;
 
-// import "./libs/byteutils.sol";
 import "./EdDSA.sol";
 import "./Semaphore.sol";
-// import "./eddsaVerifier.sol";
+import "./Poseidon.sol";
 
 contract beacon is Semaphore, EdDSA {
     mapping(uint256 => uint256) public beacons;
@@ -29,14 +28,18 @@ contract beacon is Semaphore, EdDSA {
     //     return insertIdentity(input[0]);
     // }
 
-    function registerVoter(uint256[2] memory pubkey, uint256 hashed_msg, uint256[2] memory R8, uint256 s) public returns (uint256) {
+    function registerVoter(uint256 idCommit, uint256 idCommitHashed, uint256[2] memory pubkey, uint256[2] memory R8, uint256 s) public returns (uint256) {
         // TODO check if the registrar pubkey is valid 
         // require(registrar[input[0]], "Unknown Registrar; Aborting Registration phase");
-        require(VerifyPoseidon(pubkey, hashed_msg, R8, s), "EdDSA signature is not valid");
 
+        // TODO check if the id commit actually matches the one that is signed
+        // uint256 hashed = PoseidonT3.poseidon([idCommit, idCommit]);
+        // require(hashed == idCommitHashed, "Fradulent id commitment. Aborting");
+
+        require(VerifyPoseidon(pubkey, idCommitHashed, R8, s), "EdDSA signature is not valid");
 
         // inserting the identity commitment in the accumulator
-        return insertIdentity(hashed_msg);
+        return insertIdentity(idCommit);
     }
 
     function vote(
