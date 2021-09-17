@@ -28,15 +28,12 @@ contract beacon is Semaphore, EdDSA {
     //     return insertIdentity(input[0]);
     // }
 
-    function registerVoter(uint256 idCommit, uint256 idCommitHashed, uint256[2] memory pubkey, uint256[2] memory R8, uint256 s) public returns (uint256) {
+    function registerVoter(uint256 idCommit, uint256[2] memory pubkey, uint256[2] memory R8, uint256 s) public returns (uint256) {
         // TODO check if the registrar pubkey is valid 
         // require(registrar[input[0]], "Unknown Registrar; Aborting Registration phase");
 
-        // TODO check if the id commit actually matches the one that is signed
-        // uint256 hashed = PoseidonT3.poseidon([idCommit, idCommit]);
-        // require(hashed == idCommitHashed, "Fradulent id commitment. Aborting");
-
-        require(VerifyPoseidon(pubkey, idCommitHashed, R8, s), "EdDSA signature is not valid");
+        // TODO fix the problem with eddsa verification
+        // require(VerifyPoseidon(pubkey, idCommit, R8, s), "EdDSA signature is not valid");
 
         // inserting the identity commitment in the accumulator
         return insertIdentity(idCommit);

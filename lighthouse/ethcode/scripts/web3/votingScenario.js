@@ -50,7 +50,6 @@ const {
     leBuff2int,
     leInt2Buff,
 } = utils;
-const biginteger = require('../../../client/node_modules/big-integer')
 
 const circomlib= require('circomlib')
 const poseidonHasher = circomlib.poseidon
@@ -62,6 +61,7 @@ const snarkjs = require('snarkjs')
 const NUM_LEVELS = 20
 const FIRST_EXTERNAL_NULLIFIER = 0
 const SIGNAL = 'signal0'
+
 let owner
 let accounts
 let wtns = {type: "mem"};
@@ -84,6 +84,7 @@ const eddsa_circuit_path = path.join(__dirname, '../../../circuits/build/eddsaVe
 const eddsa_zkey_final = path.join(__dirname, '../../../circuits/build/eddsaVerifier_final.zkey')
 const eddsaVerifyingKeyPath = path.join(__dirname, '../../../circuits/build/eddsaVerification_key.json')
 
+let voteCount = 0;
 
 const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     // define the sender of the tx
@@ -91,54 +92,30 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     owner = web3.eth.accounts.privateKeyToAccount("0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6");
     accounts = await web3.eth.getAccounts()
 
-   // PHASE 00 VOTER: CREATING IDENTITY
+    // PHASE 00 VOTER: CREATING IDENTITY
     const identity = genIdentity();
     const identityCommitment = genIdentityCommitment(identity);
 
     // PHASE 01 REGISTRATION
     // the registrar signs the commitment
     const { privKey, pubKey } = genKeypair();
-    const { signature, msg } = genSignedMsg(
+    const { signature, msg } = genEdDSA(
         privKey,
         identityCommitment,
-        0, 
     )
 
     var regTx = semaphoreInstance.methods.registerVoter(
-        identityCommitment.toString(),
-        msg.toString(),
-        [pubKey[0].toString(), pubKey[1].toString()],
-        [signature.R8[0].toString(), signature.R8[1].toString()],
-        signature.S.toString()
+        stringifyBigInts(identityCommitment),
+        [stringifyBigInts(pubKey[0]), stringifyBigInts(pubKey[1])],
+        [stringifyBigInts(signature.R8[0]), stringifyBigInts(signature.R8[1])],
+        stringifyBigInts(signature.S)
     )
     var regVoterReceipt = await send(web3, owner, regTx);
     console.log("registered voter ", regVoterReceipt.status);
-
-
-    // // voter calculates the proof of knowledge to show valid signature by registrar PK
-    // const { proof, publicSignals } = await genEddsaProof(
-    //     identityCommitment, 
-    //     pubKey,
-    //     signature,
-    //     eddsa_circuit_path,
-    //     eddsa_zkey_final
-    // )
-    // edvKey = parseVerifyingKeyJson(fs.readFileSync(eddsaVerifyingKeyPath).toString())
-    // const res = await snarkjs.groth16.verify(edvKey, publicSignals, proof);
-    // console.log("eddsa proof verification result: ", res)
-    
-    // // voter (or someone on behalf of it) makes a registerVoter tx
-    // var regParams = genRegisterVoterParams(proof, publicSignals)
-    // var regTx = semaphoreInstance.methods.registerVoter(regParams.a, regParams.b, regParams.c, regParams.input)
-    // var regReceipt = await send(web3, owner, regTx)
-    // console.log("voter registered: ", regReceipt.status)
-
-
-
-
-    console.log("inserting ", identityCommitment.toString())
-    // insertedIdentityCommitments.push('0x' + identityCommitment.toString(16))
     insertedIdentityCommitments.push(identityCommitment)
+
+
+    // PHASE 02 VOTING
 
     // this fixes the `param.substring() is not a function` bug
     // in ABICoder.prototype.formatParam in web3.eth.abi
@@ -151,6 +128,7 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
         sigbyte.push(sig[i]);
     }
 
+    // getting all the commitments on chain, to create a zk-proof of membership
     semaphoreInstance.methods.getIdentityCommitments().call({ from: accounts[0] }, async function(err, leaves){
         console.log("generating proof")
         proof_res = await genLighthouseProof(
@@ -161,17 +139,15 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
             NUM_LEVELS,
             FIRST_EXTERNAL_NULLIFIER,
         )
-        wtns = proof_res.wtns
         console.log("root: ", proof_res.merkleProof.root)
         console.log("public signals ", proof_res.publicSignals)
         console.log("generating proof and public signals")
         
         vKey = parseVerifyingKeyJson(fs.readFileSync(verifyingKeyPath).toString())
         const res = await snarkjs.groth16.verify(vKey, proof_res.publicSignals, proof_res.proof);
-        console.log(res)
+        console.log("proof validity: ", res)
 
-     
-
+        // sending the vote transaction
         console.log("send the vote tx")
         var params = genBroadcastSignalParams(SIGNAL, proof_res.proof, proof_res.publicSignals)
         var tx = semaphoreInstance.methods.broadcastSignal(
@@ -184,14 +160,11 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
         var receipt = await send(web3, owner, tx)
         console.log("voted ", receipt.status)
 
-        // do the tally
-        // let contractAddress = semaphoreInstance.options.address
-        // let indexExists = true
-        // let index = 0
-        // while (indexExists) {
-        //     console.log(`[${index}]` + await web3.eth.getStorageAt(contractAddress, index))
-        //     index++
-        // }
+        if (voteCount < 10)
+        {
+            voteCount++
+            doScenario(semaphoreInstance, semaphoreClientInstance)
+        }
     });
 }
 
@@ -289,18 +262,19 @@ const genLighthouseProof = async (
 
     const identityCommitment = genIdentityCommitment(identity)
     const index = idCommitmentsAsBigInts.indexOf(stringifyBigInts(identityCommitment))
+
     const tree = new IncrementalQuinTree(treeDepth, NOTHING_UP_MY_SLEEVE, 2)
-    // for (let ic of idCommitments) {
-    //     tree.insert(unstringifyBigInts(ic))
-    // }
-    tree.insert(identityCommitment)
+
+    for (let ic of idCommitments) {
+        tree.insert(unstringifyBigInts(ic))
+    }
     tree.update(index, identityCommitment)
 
     const merkleProof = tree.genMerklePath(index)
 
     const signalHash = keccak256HexToBigInt(ethers.utils.hexlify((signal)))
 
-    const { signature, msg } = genSignedMsg(
+    const { signature, msg } = genEdDSAPoseidon(
         identity.keypair.privKey,
         externalNullifier,
         signalHash, 
@@ -315,7 +289,7 @@ const genLighthouseProof = async (
         identity_trapdoor: stringifyBigInts(identity.identityTrapdoor),
         identity_path_elements: stringifyBigInts(merkleProof.pathElements),
         identity_path_index: stringifyBigInts(merkleProof.indices),
-        fake_zero: stringifyBigInts(biginteger(0)),
+        fake_zero: stringifyBigInts(BigInt(0)),
     }
     fs.writeFileSync(path.join(__dirname, '../../data/input.json'), JSON.stringify(input, null, 2))
 
@@ -336,15 +310,9 @@ const genLighthouseProof = async (
     // shell.exec(`node --max-old-space-size=16384 --stack-size=1073741 ../node_modules/snarkjs/cli.js groth16 fullprove ../data/input.json ../../circuits/build/lighthouse.wasm lighthouse_final.zkey ../data/proof.json ../data/public.json`)
    
     return {
-        wtns,
         signal,
         signalHash,
-        // signature,
-        // msg,
         tree,
-        // identityPath,
-        // identityPathIndex,
-        // identityPathElements,
         merkleProof, 
         proof, 
         publicSignals
@@ -383,7 +351,7 @@ const pedersenHash = (ints) => {
         )
     )
 
-    return biginteger(p[0])
+    return BigInt(p[0])
 }
 
 const keccak256HexToBigInt = (
@@ -400,7 +368,7 @@ const keccak256HexToBigInt = (
     return signalHash
 }
 
-const genSignedMsg = (
+const genEdDSAPoseidon = (
     privKey,
     lhs,
     rhs,
@@ -410,6 +378,17 @@ const genSignedMsg = (
         lhs,
         rhs,
     ])
+
+    return {
+        msg,
+        signature: sign(privKey, msg),
+    }
+}
+
+const genEdDSA = (
+    privKey,
+    msg,
+) => {
 
     return {
         msg,
