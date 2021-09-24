@@ -61,6 +61,7 @@ const snarkjs = require('snarkjs')
 const NUM_LEVELS = 20
 const FIRST_EXTERNAL_NULLIFIER = 0
 const SIGNAL = 'signal0'
+const votes = ["OptionA", "OptionB", "OptionC", "VoidVote"]
 
 let owner
 let accounts
@@ -84,17 +85,26 @@ const eddsa_circuit_path = path.join(__dirname, '../../../circuits/build/eddsaVe
 const eddsa_zkey_final = path.join(__dirname, '../../../circuits/build/eddsaVerifier_final.zkey')
 const eddsaVerifyingKeyPath = path.join(__dirname, '../../../circuits/build/eddsaVerification_key.json')
 
+const MAX_VOTES = 1;
 let voteCount = 0;
+const currentEthGasPrice = 123;  // 123GWei according to https://ethgasstation.info/ as of September 2021
+const currentEthPrice = 3300; // dollars
+let gasSpent = 0;
+
+const initiatorSk = "0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6"
+let initiatorPk;
 
 const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     // define the sender of the tx
     // accounts = await web3.eth.getAccounts(/*console.log*/)
-    owner = web3.eth.accounts.privateKeyToAccount("0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6");
+    owner = web3.eth.accounts.privateKeyToAccount(initiatorSk);
+    initiatorPk = owner.address
     accounts = await web3.eth.getAccounts()
 
     // PHASE 00 VOTER: CREATING IDENTITY
     const identity = genIdentity();
     const identityCommitment = genIdentityCommitment(identity);
+    const sharedKey = genEcdhSharedKey(stringifyBigInts(identity.keypair.privKey), initiatorPk)
 
     // PHASE 01 REGISTRATION
     // the registrar signs the commitment
@@ -111,6 +121,8 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
         stringifyBigInts(signature.S)
     )
     var regVoterReceipt = await send(web3, owner, regTx);
+    console.log("spent gas for registration ", regVoterReceipt.gasUsed)
+    gasSpent += regVoterReceipt.gasUsed
     console.log("registered voter ", regVoterReceipt.status);
     insertedIdentityCommitments.push(identityCommitment)
 
@@ -119,7 +131,9 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
 
     // this fixes the `param.substring() is not a function` bug
     // in ABICoder.prototype.formatParam in web3.eth.abi
-    var sig = ethers.utils.toUtf8Bytes(SIGNAL)
+    var vote = votes[Math.floor(Math.random()*votes.length)];
+    var encVote = encrypt(vote, sharedKey)
+    var sig = ethers.utils.toUtf8Bytes(encVote)
     var sigbyte = []
     if (sig.length % 2 != 0) {
         sigbyte.push(0)
@@ -158,12 +172,21 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
             params.externalNullifier
         )
         var receipt = await send(web3, owner, tx)
+        console.log("spent gas for voting ", receipt.gasUsed)
+        gasSpent += receipt.gasUsed
         console.log("voted ", receipt.status)
 
-        if (voteCount < 10)
+        voteCount++
+        if (voteCount < MAX_VOTES)
         {
-            voteCount++
             doScenario(semaphoreInstance, semaphoreClientInstance)
+        }
+        else
+        {
+            // the scenario is finished
+            console.log("Total gas spent: ", gasSpent)
+            console.log("Total price of tx: ", gasSpent * currentEthGasPrice / 1000000000 , "eth")
+            // console.log("remaining balance ", await web3.eth.getBalance(owner))
         }
     });
 }
@@ -174,9 +197,9 @@ async function send(web3, account, transaction) {
             const options = {
                 data: transaction.encodeABI(),
                 to: transaction._parent._address,
-                //gas: await transaction.estimateGas({ from: account.address }),
-                gas: 2100000,
-                gasPrice: 10000000000,
+                gas: await transaction.estimateGas({ from: account.address }),
+                // gas: 2100000,
+                // gasPrice: currentEthGasPrice * 1000000000,
             };
             const signed = await web3.eth.accounts.signTransaction(options, account.privateKey);
             const receipt = await web3.eth.sendSignedTransaction(signed.rawTransaction);
