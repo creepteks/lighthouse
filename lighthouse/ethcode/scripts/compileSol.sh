@@ -1,4 +1,4 @@
 rm ./build/*
-solc --bin --abi contracts/*.sol -o build/ --overwrite
+solc --bin --abi --optimize-runs 200 contracts/*.sol -o build/ --overwrite
 cd scripts
 node createPoseidon.js
