@@ -19,11 +19,13 @@ function findImports (fileName) {
     return {contents : file}
 }
 
+// TODO refactor the contract compilation and deployment. It seems totally repetitive as it started with 1 lib and now is 4 (and counting ?? :-))
 async function startDeployment(deployMainContract) {
+    owner = (await web3.eth.getAccounts())[0]
+
     // creating the poseidonT3 contract by compilation
     var poseidonT3Json = require('../../build/PoseidonT3.json')
     var poseidonT3Contract = new ethcontract(poseidonT3Json.abi)
-    owner = (await web3.eth.getAccounts())[0]
     poseidonT3Contract.deploy({data: poseidonT3Json.bytecode})
     .send({
         from:  owner,
@@ -47,7 +49,6 @@ async function startDeployment(deployMainContract) {
     // creating the poseidonT6 contract by compilation
     var poseidonT6Json = require('../../build/PoseidonT6.json')
     var poseidonT6Contract = new ethcontract(poseidonT6Json.abi)
-    owner = (await web3.eth.getAccounts())[0]
     poseidonT6Contract.deploy({data: poseidonT6Json.bytecode})
     .send({
         from:  owner,
@@ -72,7 +73,6 @@ async function startDeployment(deployMainContract) {
     var babyjubAbi = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../build/JubJub.abi'), 'utf-8').toString())
     var babyjubBin = fs.readFileSync(path.resolve(__dirname, '../../build/JubJub.bin'), 'utf-8').toString()
     var babyJubContract = new ethcontract(babyjubAbi)
-    owner = (await web3.eth.getAccounts())[0]
     babyJubContract.deploy({data: babyjubBin})
     .send({
         from:  owner,

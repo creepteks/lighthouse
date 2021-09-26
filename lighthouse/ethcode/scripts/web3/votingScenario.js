@@ -61,7 +61,7 @@ const snarkjs = require('snarkjs')
 const NUM_LEVELS = 20
 const FIRST_EXTERNAL_NULLIFIER = 0
 const SIGNAL = 'signal0'
-const votes = ["OptionA", "OptionB", "OptionC", "VoidVote"]
+const votes = [0n, 1n, 2n, 3n]
 
 let owner
 let accounts
@@ -91,32 +91,35 @@ const currentEthGasPrice = 123;  // 123GWei according to https://ethgasstation.i
 const currentEthPrice = 3300; // dollars
 let gasSpent = 0;
 
-const initiatorSk = "0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6"
-let initiatorPk;
+let votingPrivKey;
+let votingPubKey;
+const initiatorEthSk = "0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6";
 
 const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
-    // define the sender of the tx
-    // accounts = await web3.eth.getAccounts(/*console.log*/)
-    owner = web3.eth.accounts.privateKeyToAccount(initiatorSk);
-    initiatorPk = owner.address
+    // PHASE 01 Voting Authorities: Initialization
+    votingPrivKey = genPrivKey()
+    votingPubKey = genPubKey(votingPrivKey)
+    // define the sender of the tx in
     accounts = await web3.eth.getAccounts()
+    owner = web3.eth.accounts.privateKeyToAccount(initiatorEthSk);
 
-    // PHASE 00 VOTER: CREATING IDENTITY
+    // PHASE 01 VOTER: CREATING IDENTITY
     const identity = genIdentity();
     const identityCommitment = genIdentityCommitment(identity);
-    const sharedKey = genEcdhSharedKey(stringifyBigInts(identity.keypair.privKey), initiatorPk)
 
-    // PHASE 01 REGISTRATION
+
+    // PHASE 02 REGISTRATION
     // the registrar signs the commitment
-    const { privKey, pubKey } = genKeypair();
+    const { privKey: regPrivKey, pubKey: regPubkey } = genKeypair();
     const { signature, msg } = genEdDSA(
-        privKey,
+        regPrivKey,
         identityCommitment,
     )
 
+    // the voter (or someone on ü's behalf) register the voter's identity commitment
     var regTx = semaphoreInstance.methods.registerVoter(
         stringifyBigInts(identityCommitment),
-        [stringifyBigInts(pubKey[0]), stringifyBigInts(pubKey[1])],
+        [stringifyBigInts(regPubkey[0]), stringifyBigInts(regPubkey[1])],
         [stringifyBigInts(signature.R8[0]), stringifyBigInts(signature.R8[1])],
         stringifyBigInts(signature.S)
     )
@@ -127,13 +130,29 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     insertedIdentityCommitments.push(identityCommitment)
 
 
-    // PHASE 02 VOTING
+    // PHASE 03 VOTING
 
+    // voter creates an ephemeral key pair
+    var ephemeralPair = genKeypair();
+    console.log("selected ephemeral key ", ephemeralPair.pubKey)
+
+    // voter computes the shared key
+    const sharedKey = genEcdhSharedKey(ephemeralPair.privKey, votingPubKey)
+    console.log("shared key from voter perspective ", sharedKey)
+
+    // voter creates a vote, but it's a test-vote as of now
+    var vote = votes[Math.floor(Math.random()*votes.length)];
+    console.log("voter's selected vote ", vote.toString())
+    var plaintext = []
+    for (let i = 0; i < 1; i++) {
+        plaintext.push(BigInt(vote))
+    }
+    // voter encrypts his voice with the shared key
+    var encVote = encrypt(plaintext, sharedKey)
+    
     // this fixes the `param.substring() is not a function` bug
     // in ABICoder.prototype.formatParam in web3.eth.abi
-    var vote = votes[Math.floor(Math.random()*votes.length)];
-    var encVote = encrypt(vote, sharedKey)
-    var sig = ethers.utils.toUtf8Bytes(encVote)
+    var sig = ethers.utils.toUtf8Bytes(encVote.toString())
     var sigbyte = []
     if (sig.length % 2 != 0) {
         sigbyte.push(0)
@@ -141,7 +160,7 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     for (let i = 0; i < sig.length; i++) {
         sigbyte.push(sig[i]);
     }
-
+    
     // getting all the commitments on chain, to create a zk-proof of membership
     semaphoreInstance.methods.getIdentityCommitments().call({ from: accounts[0] }, async function(err, leaves){
         console.log("generating proof")
@@ -163,8 +182,12 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
 
         // sending the vote transaction
         console.log("send the vote tx")
+
+        // voter (or someone on ü's behalf) sends the vote tx
         var params = genBroadcastSignalParams(SIGNAL, proof_res.proof, proof_res.publicSignals)
-        var tx = semaphoreInstance.methods.broadcastSignal(
+        var tx = semaphoreInstance.methods.vote(
+            ephemeralPair.pubKey,
+            encVote,
             sigbyte, 
             params.proof,
             params.root,
@@ -186,7 +209,22 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
             // the scenario is finished
             console.log("Total gas spent: ", gasSpent)
             console.log("Total price of tx: ", gasSpent * currentEthGasPrice / 1000000000 , "eth")
-            // console.log("remaining balance ", await web3.eth.getBalance(owner))
+            doTally(semaphoreInstance)
+        }
+    });
+}
+
+const doTally = async function(semaphoreInstance) {
+    semaphoreInstance.methods.getBallots().call({ from: accounts[0] }, async function(err, ballots){
+        for (let i = 0; i < ballots.length; i++) {
+            const ballot = ballots[i];
+            const key = ballot.pubKey
+            console.log("voter ephemeral key ", key)
+            const encVote = ballot.encVote
+            const sharedKey = genEcdhSharedKey(votingPrivKey, [unstringifyBigInts(key[0]), unstringifyBigInts(key[1])])
+            console.log("shared key from tally PoV ", sharedKey)
+            var vote = decrypt(encVote, sharedKey)
+            console.log("decrypted vote ", vote.toString())
         }
     });
 }
