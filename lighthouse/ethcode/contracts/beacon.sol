@@ -11,11 +11,16 @@ contract beacon is Semaphore {
         uint256 iv;
         uint256[] data;
     }
+
     struct Ballot {
         uint256[2] pubKey;
         Cyphertext encVote;
     }
+    
+    // inserted commitments as leafs in the merkle tree
+    uint256[] public identityCommitments;
     Ballot[] public beacons;
+
 
     constructor(uint8 _treeLevels, uint232 _randomBeaconNullifier)
         Semaphore(_treeLevels, _randomBeaconNullifier)
@@ -30,7 +35,9 @@ contract beacon is Semaphore {
         // require(VerifyPoseidon(pubkey, idCommit, R8, s), "EdDSA signature is not valid");
 
         // inserting the identity commitment in the accumulator
-        return insertIdentity(idCommit);
+        uint256 index = insertIdentity(idCommit);
+        identityCommitments.push(idCommit);
+        return index;
     }
 
     function vote(
@@ -50,6 +57,15 @@ contract beacon is Semaphore {
 
         result = true;
     }
+
+    function getIdentityCommitments() public view returns (uint256 [] memory) {
+        return identityCommitments;
+    }
+
+    function getIdentityCommitment(uint256 _index) public view returns (uint256) {
+        return identityCommitments[_index];
+    }
+
 
     function getBallots() public view returns (Ballot[] memory votes) {
         return beacons;

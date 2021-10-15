@@ -21,11 +21,11 @@
 
 pragma solidity ^0.6.11;
 
-import "./lighthouseVerifier.sol";
+import "./verifier.sol";
 import { IncrementalMerkleTree } from "./IncrementalMerkleTree.sol";
 import "./Ownable.sol";
 
-contract Semaphore is LighthouseVerifier, IncrementalMerkleTree, Ownable {
+contract Semaphore is Verifier, IncrementalMerkleTree, Ownable {
     // The external nullifier helps to prevent double-signalling by the same
     // user. An external nullifier can be active or deactivated.
 
@@ -50,13 +50,12 @@ contract Semaphore is LighthouseVerifier, IncrementalMerkleTree, Ownable {
 
     // Whether broadcastSignal() can only be called by the owner of this
     // contract. This is the case as a safe default.
-    bool public isBroadcastPermissioned = false;
+    bool public isBroadcastPermissioned = true;
 
     // Whether the contract has already seen a particular nullifier hash
     mapping (uint256 => bool) public nullifierHashHistory;
 
-    // inserted commitments as leafs in the merkle tree
-    uint256[] public identityCommitments;
+
 
     event PermissionSet(bool indexed newPermission);
     event ExternalNullifierAdd(uint232 indexed externalNullifier);
@@ -95,16 +94,9 @@ contract Semaphore is LighthouseVerifier, IncrementalMerkleTree, Ownable {
      */
     constructor(uint8 _treeLevels, uint232 _firstExternalNullifier)
         IncrementalMerkleTree(_treeLevels, NOTHING_UP_MY_SLEEVE_ZERO)
+        Ownable()
         public {
             addEn(_firstExternalNullifier, true);
-    }
-
-    function getIdentityCommitments() public view returns (uint256 [] memory) {
-        return identityCommitments;
-    }
-
-    function getIdentityCommitment(uint256 _index) public view returns (uint256) {
-        return identityCommitments[_index];
     }
 
     /*
@@ -123,10 +115,7 @@ contract Semaphore is LighthouseVerifier, IncrementalMerkleTree, Ownable {
             "Semaphore: identity commitment cannot be the nothing-up-my-sleeve-value"
         );
 
-        uint256 insertionIndex = insertLeaf(_identityCommitment);
-        identityCommitments.push(_identityCommitment);
-
-        return insertionIndex;
+        return insertLeaf(_identityCommitment);
     }
 
     /*
@@ -253,7 +242,7 @@ contract Semaphore is LighthouseVerifier, IncrementalMerkleTree, Ownable {
             areAllValidFieldElements(_proof) &&
             _root < SNARK_SCALAR_FIELD &&
             _nullifiersHash < SNARK_SCALAR_FIELD &&
-            verifyLighthouseProof(a, b, c, publicSignals);
+            verifyProof(a, b, c, publicSignals);
     }
 
     /*
@@ -310,7 +299,7 @@ contract Semaphore is LighthouseVerifier, IncrementalMerkleTree, Ownable {
             unpackProof(_proof);
 
         require(
-            verifyLighthouseProof(a, b, c, publicSignals),
+            verifyProof(a, b, c, publicSignals),
             "Semaphore: invalid proof"
         );
 
