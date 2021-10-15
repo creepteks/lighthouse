@@ -89,13 +89,15 @@ const MAX_VOTES = 1;
 let voteCount = 0;
 const currentEthGasPrice = 123;  // 123GWei according to https://ethgasstation.info/ as of September 2021
 const currentEthPrice = 3300; // dollars
-let gasSpent = 0;
+let txGas = 0;
+let deployGas = 0;
+let contractGas = 0;
 
 let votingPrivKey;
 let votingPubKey;
 const initiatorEthSk = "0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6";
 
-const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
+const doScenario = async function(semaphoreInstance) {
     // PHASE 01 Voting Authorities: Initialization
     votingPrivKey = genPrivKey()
     votingPubKey = genPubKey(votingPrivKey)
@@ -125,7 +127,7 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
     )
     var regVoterReceipt = await send(web3, owner, regTx);
     console.log("spent gas for registration ", regVoterReceipt.gasUsed)
-    gasSpent += regVoterReceipt.gasUsed
+    txGas += regVoterReceipt.gasUsed
     console.log("registered voter ", regVoterReceipt.status);
     insertedIdentityCommitments.push(identityCommitment)
 
@@ -196,19 +198,21 @@ const doScenario = async function(semaphoreInstance, semaphoreClientInstance) {
         )
         var receipt = await send(web3, owner, tx)
         console.log("spent gas for voting ", receipt.gasUsed)
-        gasSpent += receipt.gasUsed
+        txGas += receipt.gasUsed
         console.log("voted ", receipt.status)
 
         voteCount++
         if (voteCount < MAX_VOTES)
         {
-            doScenario(semaphoreInstance, semaphoreClientInstance)
+            doScenario(semaphoreInstance)
         }
         else
         {
             // the scenario is finished
-            console.log("Total gas spent: ", gasSpent)
-            console.log("Total price of tx: ", gasSpent * currentEthGasPrice / 1000000000 , "eth")
+            console.log("Total lib deployment gas: ", deployGas)
+            console.log("Total contract deployment gas: ", contractGas)
+            console.log("Total gas spent: ", txGas)
+            console.log("Total price of tx: ", txGas * currentEthGasPrice / 1000000000 , "eth")
             doTally(semaphoreInstance)
         }
     });
@@ -235,9 +239,9 @@ async function send(web3, account, transaction) {
             const options = {
                 data: transaction.encodeABI(),
                 to: transaction._parent._address,
-                gas: await transaction.estimateGas({ from: account.address }),
-                // gas: 2100000,
-                // gasPrice: currentEthGasPrice * 1000000000,
+                // gas: await transaction.estimateGas({ from: account.address }),
+                gas: 2100000,
+                gasPrice: currentEthGasPrice * 1000000000,
             };
             const signed = await web3.eth.accounts.signTransaction(options, account.privateKey);
             const receipt = await web3.eth.sendSignedTransaction(signed.rawTransaction);
@@ -254,14 +258,17 @@ async function startScenario() {
     const { 
         startDeployment,
         deploySemaphore,
-        deploySemaphoreClient
     } = await require('./deployLighthouse_web3')
     await startDeployment(function() {
-        deploySemaphore(function() {
-            deploySemaphoreClient(function(semaphoreInstance, semaphoreClientInstance) {
-                doScenario(semaphoreInstance, semaphoreClientInstance)
-            })
+        deploySemaphore(function(semaphoreInstance) {
+            doScenario(semaphoreInstance)
+        }, function(gasUsed) {
+            console.log("contract gas used: ", gasUsed)
+            contractGas += gasUsed
         })
+    }, function(gasUsed) {
+        console.log("library used gas: ", gasUsed)
+        deployGas += gasUsed
     })
 }
 
