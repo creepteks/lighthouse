@@ -1,6 +1,6 @@
 // original implementation at
 // https://github.com/appliedzkp/maci/blob/master/circuits/circom/hasherPoseidon.circom
-include "./poseidonHashT3.circom"
+include "../../node_modules/circomlib/circuits/poseidon.circom";
 
 template HashLeftRight() {
   signal input left;
@@ -13,4 +13,29 @@ template HashLeftRight() {
   right ==> hasher.inputs[1];
 
   hash <== hasher.out;
+}
+
+
+template PoseidonHashT3() {
+    var nInputs = 2;
+    signal input inputs[nInputs];
+    signal output out;
+
+    component hasher = Poseidon(nInputs);
+    for (var i = 0; i < nInputs; i ++) {
+        hasher.inputs[i] <== inputs[i];
+    }
+    out <== hasher.out;
+}
+
+template PoseidonHashT4() {
+    var nInputs = 3;
+    signal input inputs[nInputs];
+    signal output out; 
+    component hasher = Poseidon(nInputs);
+    for (var i = 0; i < nInputs; i ++) {
+        hasher.inputs[i] <== inputs[i];
+    }
+
+    out <== hasher.out;
 }

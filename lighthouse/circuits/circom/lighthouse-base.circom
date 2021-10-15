@@ -15,67 +15,57 @@ function assert (condition) {
   }
 }
 
-template CalculateIdentityCommitment(IDENTITY_PK_SIZE_IN_BITS, NULLIFIER_TRAPDOOR_SIZE_IN_BITS) {
-  signal input identity_pk[IDENTITY_PK_SIZE_IN_BITS];
-  signal input identity_nullifier[NULLIFIER_TRAPDOOR_SIZE_IN_BITS];
-  signal input identity_trapdoor[NULLIFIER_TRAPDOOR_SIZE_IN_BITS];
+template VerifyPkOnCurve() {
+    signal input identity_pk[2];
 
-  signal output out;
-
-  // identity commitment is a pedersen hash of (identity_pk, identity_nullifier, identity_trapdoor), each element padded up to 256 bits
-  component identity_commitment = Pedersen(3*256);
-  for (var i = 0; i < 256; i++) {
-    if (i < IDENTITY_PK_SIZE_IN_BITS) {
-      identity_commitment.in[i] <== identity_pk[i];
-    } else {
-      identity_commitment.in[i] <== 0;
-    }
-
-    if (i < NULLIFIER_TRAPDOOR_SIZE_IN_BITS) {
-      identity_commitment.in[i + 256] <== identity_nullifier[i];
-      identity_commitment.in[i + 2*256] <== identity_trapdoor[i];
-    } else {
-      identity_commitment.in[i + 256] <== 0;
-      identity_commitment.in[i + 2*256] <== 0;
-    }
-  }
-
-  out <== identity_commitment.out[0];
+    component verify_identity_pk_on_curve = BabyCheck();
+    verify_identity_pk_on_curve.x <== identity_pk[0];
+    verify_identity_pk_on_curve.y <== identity_pk[1];
 }
 
-template CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_SIZE_IN_BITS, n_levels) {
-  signal input external_nullifier;
-  signal input identity_nullifier[NULLIFIER_TRAPDOOR_SIZE_IN_BITS];
-  signal input identity_path_index[n_levels];
+template Pk2SubgroupElement() {
+    signal input identity_pk[2];
+    signal output out;
 
-  signal output nullifiers_hash;
+    component dbl1 = BabyDbl();
+    dbl1.x <== identity_pk[0];
+    dbl1.y <== identity_pk[1];
+    component dbl2 = BabyDbl();
+    dbl2.x <== dbl1.xout;
+    dbl2.y <== dbl1.yout;
+    component dbl3 = BabyDbl();
+    dbl3.x <== dbl2.xout;
+    dbl3.y <== dbl2.yout;
 
-  component external_nullifier_bits = Num2Bits(EXTERNAL_NULLIFIER_SIZE_IN_BITS);
-  external_nullifier_bits.in <== external_nullifier;
+    out <== dbl3.xout;
+}
 
-  var nullifiers_hasher_bits = NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels;
-  if (nullifiers_hasher_bits < 530) {
-    nullifiers_hasher_bits = 530;
-  }
+template CalculateIdentityCommitment() {
+    signal input identity_public_key_subgroup_element;
+    signal input identity_nullifier;
+    signal input identity_trapdoor;
 
-  component nullifiers_hasher = Pedersen(nullifiers_hasher_bits);
-  for (var i = 0; i < NULLIFIER_TRAPDOOR_SIZE_IN_BITS; i++) {
-    nullifiers_hasher.in[i] <== identity_nullifier[i];
-  }
+    signal output out;
 
-  for (var i = 0; i < EXTERNAL_NULLIFIER_SIZE_IN_BITS; i++) {
-    nullifiers_hasher.in[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + i] <== external_nullifier_bits.out[i];
-  }
+    component hasher = PoseidonHashT4();
+    hasher.inputs[0] <== identity_public_key_subgroup_element;
+    hasher.inputs[1] <== identity_nullifier;
+    hasher.inputs[2] <== identity_trapdoor;
+    out <== hasher.out;
+}
 
-  for (var i = 0; i < n_levels; i++) {
-    nullifiers_hasher.in[NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + i] <== identity_path_index[i];
-  }
+template CalculateNullifierHash() {
+    signal input external_nullifier;
+    signal input identity_nullifier;
+    signal input path_index_num;
 
-  for (var i = (NULLIFIER_TRAPDOOR_SIZE_IN_BITS + EXTERNAL_NULLIFIER_SIZE_IN_BITS + n_levels); i < nullifiers_hasher_bits; i++) {
-    nullifiers_hasher.in[i] <== 0;
-  }
+    signal output out;
 
-  nullifiers_hash <== nullifiers_hasher.out[0];
+    component hasher = PoseidonHashT4();
+    hasher.inputs[0] <== external_nullifier;
+    hasher.inputs[1] <== identity_nullifier;
+    hasher.inputs[2] <== path_index_num;
+    out <== hasher.out;
 }
 
 // n_levels must be < 32
@@ -121,24 +111,22 @@ template Lighthouse(n_levels) {
     verify_auth_sig_r_on_curve.x <== auth_sig_r[0];
     verify_auth_sig_r_on_curve.y <== auth_sig_r[1];
 
-    component identity_nullifier_bits = Num2Bits(NULLIFIER_TRAPDOOR_SIZE_IN_BITS);
-    identity_nullifier_bits.in <== identity_nullifier;
-
-    component identity_trapdoor_bits = Num2Bits(NULLIFIER_TRAPDOOR_SIZE_IN_BITS);
-    identity_trapdoor_bits.in <== identity_trapdoor;
-
-    component identity_pk_0_bits = Num2Bits_strict();
-    identity_pk_0_bits.in <== identity_pk[0];
 
     // BEGIN identity commitment
-    component identity_commitment = CalculateIdentityCommitment(IDENTITY_PK_SIZE_IN_BITS, NULLIFIER_TRAPDOOR_SIZE_IN_BITS);
-    for (var i = 0; i < IDENTITY_PK_SIZE_IN_BITS; i++) {
-      identity_commitment.identity_pk[i] <== identity_pk_0_bits.out[i];
-    }
-    for (var i = 0; i < NULLIFIER_TRAPDOOR_SIZE_IN_BITS; i++) {
-      identity_commitment.identity_nullifier[i] <== identity_nullifier_bits.out[i];
-      identity_commitment.identity_trapdoor[i] <== identity_trapdoor_bits.out[i];
-    }
+
+    component verifyPkOnCurve = VerifyPkOnCurve();
+    verifyPkOnCurve.identity_pk[0] <== identity_pk[0];
+    verifyPkOnCurve.identity_pk[1] <== identity_pk[1];
+
+    component pk2SubgroupElement = Pk2SubgroupElement();
+    pk2SubgroupElement.identity_pk[0] <== identity_pk[0];
+    pk2SubgroupElement.identity_pk[1] <== identity_pk[1];
+
+    component identity_commitment = CalculateIdentityCommitment();
+    identity_commitment.identity_public_key_subgroup_element <== pk2SubgroupElement.out;
+    identity_commitment.identity_nullifier <== identity_nullifier;
+    identity_commitment.identity_trapdoor <== identity_trapdoor;
+    
     // END identity commitment
 
     // BEGIN tree
@@ -152,15 +140,16 @@ template Lighthouse(n_levels) {
     // END tree
 
     // BEGIN nullifiers
-    component nullifiers_hasher = CalculateNullifier(NULLIFIER_TRAPDOOR_SIZE_IN_BITS, EXTERNAL_NULLIFIER_SIZE_IN_BITS, n_levels);
-    nullifiers_hasher.external_nullifier <== external_nullifier;
-    for (var i = 0; i < NULLIFIER_TRAPDOOR_SIZE_IN_BITS; i++) {
-      nullifiers_hasher.identity_nullifier[i] <== identity_nullifier_bits.out[i];
+    component bit2num = Bits2Num(n_levels);
+    for (var i = 0; i < n_levels; i ++) {
+      bit2num.in[i] <== identity_path_index[i];
     }
-    for (var i = 0; i < n_levels; i++) {
-      nullifiers_hasher.identity_path_index[i] <== identity_path_index[i];
-    }
-    nullifiers_hash <== nullifiers_hasher.nullifiers_hash;
+    component calculateNullifierHash = CalculateNullifierHash();
+    calculateNullifierHash.external_nullifier <== external_nullifier;
+    calculateNullifierHash.identity_nullifier <== identity_nullifier;
+    calculateNullifierHash.path_index_num <== bit2num.out;
+
+    nullifiers_hash <== calculateNullifierHash.out;
     // END nullifiers
 
     // BEGIN verify sig
