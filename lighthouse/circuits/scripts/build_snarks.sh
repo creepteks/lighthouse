@@ -154,30 +154,9 @@ echo "---------------------"
 
 echo "---------------------"
 echo 'Generating lighthouseVerifier.sol'
-npx snarkjs zkey export solidityverifier lighthouse_final.zkey lighthouseVerifier.sol
+npx snarkjs zkey export solidityverifier lighthouse_final.zkey verifier.sol
 echo "---------------------"
 
-echo "---------------------"
-if [ -f ./eddsaverification_key.json ]; then
-    echo "Verification key exists. Skipping"
-else    
-    echo "starting Groth16 setup phase"
-    npx snarkjs groth16 setup eddsaVerifier.r1cs pot12_final.ptau eddsaVerifier_0000.zkey
-    npx snarkjs zkey contribute eddsaVerifier_0000.zkey eddsaVerifier_0001.zkey --name="1st Contributor Name" -v -e="Some random entropy"
-    npx snarkjs zkey contribute eddsaVerifier_0001.zkey eddsaVerifier_final.zkey --name="Second contribution Name" -v -e="Another random entropy"
-    # TODO add build time arg for dev and full trusted setup mode
-    # npx snarkjs zkey contribute eddsaVerifier_0001.zkey eddsaVerifier_0002.zkey --name="Second contribution Name" -v -e="Another random entropy"
-    # npx snarkjs zkey export bellman eddsaVerifier_0002.zkey  challenge_phase2_0003
-    # npx snarkjs zkey bellman contribute bn128 challenge_phase2_0003 response_phase2_0003 -e="some random text"
-    # npx snarkjs zkey import bellman eddsaVerifier_0002.zkey response_phase2_0003 eddsaVerifier_0003.zkey -n="Third contribution name"
-    # npx snarkjs zkey verify eddsaVerifier.r1cs pot12_final.ptau eddsaVerifier_0003.zkey
-    # npx snarkjs zkey beacon eddsaVerifier_0003.zkey eddsaVerifier_final.zkey 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f 10 -n="Final Beacon phase2"
-    npx snarkjs zkey verify eddsaVerifier.r1cs pot12_final.ptau eddsaVerifier_final.zkey
-    npx snarkjs zkey export verificationkey eddsaVerifier_final.zkey eddsaVerification_key.json
-fi
-echo "---------------------"
-
-echo "---------------------"
-echo 'Generating eddsaVerifier.sol'
-npx snarkjs zkey export solidityverifier eddsaVerifier_final.zkey eddsaVerifier.sol
-echo "---------------------"
+# Copy verifier.sol to the contracts/sol directory
+echo 'Copying verifier.sol to contracts/sol.'
+cp ./verifier.sol ../../ethcode/contracts/
