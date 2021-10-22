@@ -58,7 +58,7 @@ const path = require('path')
 const ethers = require('ethers')
 const snarkjs = require('snarkjs')
 
-const NUM_LEVELS = 20
+const TREE_DEPTH = 6
 const FIRST_EXTERNAL_NULLIFIER = 0
 const SIGNAL = 'signal0'
 const votes = [0n, 1n, 2n, 3n]
@@ -96,28 +96,35 @@ let contractGas = 0;
 let votingPrivKey;
 let votingPubKey;
 const initiatorEthSk = "0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6";
+let regPrivKey;
+let regPubkey;
 
-const doScenario = async function(semaphoreInstance) {
+async function initScenario() {
     // PHASE 01 Voting Authorities: Initialization
     votingPrivKey = genPrivKey()
     votingPubKey = genPubKey(votingPrivKey)
     // define the sender of the tx in
     accounts = await web3.eth.getAccounts()
     owner = web3.eth.accounts.privateKeyToAccount(initiatorEthSk);
+    
+    // registrar init
+    var pair = genKeypair();
+    regPrivKey = pair.privKey
+    regPubkey = pair.pubKey
 
+}
+const doScenario = async function(semaphoreInstance) {
     // PHASE 01 VOTER: CREATING IDENTITY
     const identity = genIdentity();
     const identityCommitment = genIdentityCommitment(identity);
-
+    
 
     // PHASE 02 REGISTRATION
     // the registrar signs the commitment
-    const { privKey: regPrivKey, pubKey: regPubkey } = genKeypair();
     const { signature, msg } = genEdDSA(
         regPrivKey,
         identityCommitment,
     )
-
     // the voter (or someone on ü's behalf) register the voter's identity commitment
     var regTx = semaphoreInstance.methods.registerVoter(
         stringifyBigInts(identityCommitment),
@@ -171,7 +178,7 @@ const doScenario = async function(semaphoreInstance) {
             lighthouse_circuit_path,
             identity,
             leaves,
-            NUM_LEVELS,
+            TREE_DEPTH,
             FIRST_EXTERNAL_NULLIFIER,
         )
         console.log("root: ", proof_res.merkleProof.root)
@@ -260,7 +267,8 @@ async function startScenario() {
         deploySemaphore,
     } = await require('./deployLighthouse_web3')
     await startDeployment(function() {
-        deploySemaphore(function(semaphoreInstance) {
+        deploySemaphore(async function(semaphoreInstance) {
+            await initScenario()
             doScenario(semaphoreInstance)
         }, function(gasUsed) {
             console.log("contract gas used: ", gasUsed)
@@ -304,9 +312,9 @@ const genIdentityCommitment = (
     identity,
 ) => {
 
-    return pedersenHash([
-        // circomlib.babyJub.mulPointEscalar(identity.keypair.pubKey, 8)[0],
-        identity.keypair.pubKey[0],
+    const hasher = poseidonHasher
+    return hasher([
+        circomlib.babyJub.mulPointEscalar(identity.keypair.pubKey, 8)[0],
         identity.identityNullifier,
         identity.identityTrapdoor,
     ])
@@ -531,15 +539,16 @@ const genBroadcastSignalParams = (
     }
 }
 
-startScenario()
 
 function test() {
     // params of baby jubjub
     const order = Scalar.fromString("21888242871839275222246405745257275088614511777268538073601725287587578984328");
     const subOrder = Scalar.shiftRight(order, 3);
-     
+    const superorder = Scalar.shiftLeft(order, 3);
     console.log(stringifyBigInts(order))
     console.log(stringifyBigInts(subOrder))
+    console.log(stringifyBigInts(superorder))
 }
 
+startScenario()
 // test()
