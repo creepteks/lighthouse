@@ -355,19 +355,6 @@ const genLighthouseProof = async (
         externalNullifier,
         signalHash, 
     )
-    var input = {
-        identity_pk: stringifyBigInts(identity.keypair.pubKey),
-        auth_sig_r: stringifyBigInts(signature.R8),
-        auth_sig_s: stringifyBigInts(signature.S),
-        signal_hash: stringifyBigInts(signalHash),
-        external_nullifier: stringifyBigInts(externalNullifier),
-        identity_nullifier: stringifyBigInts(identity.identityNullifier),
-        identity_trapdoor: stringifyBigInts(identity.identityTrapdoor),
-        identity_path_elements: stringifyBigInts(merkleProof.pathElements),
-        identity_path_index: stringifyBigInts(merkleProof.indices),
-        fake_zero: stringifyBigInts(BigInt(0)),
-    }
-    fs.writeFileSync(path.join(__dirname, '../../data/input.json'), JSON.stringify(input, null, 2))
 
     const {proof, publicSignals} = await snarkjs.groth16.fullProve({
         identity_pk: identity.keypair.pubKey,
