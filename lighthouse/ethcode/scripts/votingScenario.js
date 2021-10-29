@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
+
 const Web3 = require('web3')
 const web3 = new Web3("ws://localhost:8545");
 
 
-const catchRevert = require("../../test/exceptions").catchRevert
+const catchRevert = require("../test/exceptions").catchRevert
 const { expect } = require('chai');
 const fs = require('fs');
 
@@ -39,7 +42,7 @@ const {
     bigInt2Buffer,
     packPubKey,
     unpackPubKey,
-} = require('../../../client/node_modules/maci-crypto')
+} = require('../../client/node_modules/maci-crypto/build')
 
 const { utils, Scalar } = require('../../../client/node_modules/ffjavascript');
 const {
@@ -355,20 +358,6 @@ const genLighthouseProof = async (
         externalNullifier,
         signalHash, 
     )
-    var input = {
-        identity_pk: stringifyBigInts(identity.keypair.pubKey),
-        auth_sig_r: stringifyBigInts(signature.R8),
-        auth_sig_s: stringifyBigInts(signature.S),
-        signal_hash: stringifyBigInts(signalHash),
-        external_nullifier: stringifyBigInts(externalNullifier),
-        identity_nullifier: stringifyBigInts(identity.identityNullifier),
-        identity_trapdoor: stringifyBigInts(identity.identityTrapdoor),
-        identity_path_elements: stringifyBigInts(merkleProof.pathElements),
-        identity_path_index: stringifyBigInts(merkleProof.indices),
-        fake_zero: stringifyBigInts(BigInt(0)),
-    }
-    fs.writeFileSync(path.join(__dirname, '../../data/input.json'), JSON.stringify(input, null, 2))
-
     const {proof, publicSignals} = await snarkjs.groth16.fullProve({
         identity_pk: identity.keypair.pubKey,
         auth_sig_r: signature.R8,

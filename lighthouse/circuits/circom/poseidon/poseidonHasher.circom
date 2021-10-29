@@ -1,5 +1,7 @@
-// original implementation at
-// https://github.com/appliedzkp/maci/blob/master/circuits/circom/hasherPoseidon.circom
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
+// For the original implementation, refer to https://github.com/appliedzkp/maci/blob/master/circuits/circom/hasherPoseidon.circom
+
 include "../../node_modules/circomlib/circuits/poseidon.circom";
 
 template HashLeftRight() {

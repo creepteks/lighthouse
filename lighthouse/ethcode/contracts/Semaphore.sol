@@ -1,23 +1,6 @@
-/*
- * Semaphore - Zero-knowledge signaling on Ethereum
- * Copyright (C) 2020 Barry WhiteHat <barrywhitehat@protonmail.com>, Kobi
- * Gurkan <kobigurk@gmail.com> and Koh Wei Jie (contact@kohweijie.com)
- *
- * This file is part of Semaphore.
- *
- * Semaphore is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Semaphore is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Semaphore.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
+// For the original implementation, refer to https://github.com/appliedzkp/semaphore/blob/master/contracts/sol/Semaphore.sol
 
 pragma solidity ^0.6.11;
 

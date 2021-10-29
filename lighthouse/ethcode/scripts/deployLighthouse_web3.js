@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
+
 // Importing dependencies
 const shell = require('shelljs')
 const path = require('path')
@@ -24,7 +27,7 @@ async function startDeployment(deployMainContract, reportLibGas) {
     owner = (await web3.eth.getAccounts())[0]
 
     // creating the poseidonT3 contract by compilation
-    var poseidonT3Json = require('../../build/PoseidonT3.json')
+    var poseidonT3Json = require('../build/PoseidonT3.json')
     var poseidonT3Contract = new ethcontract(poseidonT3Json.abi)
     poseidonT3Contract.deploy({data: poseidonT3Json.bytecode})
     .send({
@@ -49,7 +52,7 @@ async function startDeployment(deployMainContract, reportLibGas) {
     } );
 
     // creating the poseidonT6 contract by compilation
-    var poseidonT6Json = require('../../build/PoseidonT6.json')
+    var poseidonT6Json = require('../build/PoseidonT6.json')
     var poseidonT6Contract = new ethcontract(poseidonT6Json.abi)
     poseidonT6Contract.deploy({data: poseidonT6Json.bytecode})
     .send({
