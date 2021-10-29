@@ -73,9 +73,9 @@ if [ -f ./pot12_0003.ptau ]; then
     echo "third contribution already added"
 else
     echo 'Generating pot12_0003.ptau (third contribution)'
-    snarkjs powersoftau export challenge pot12_0002.ptau challenge_0003
-    snarkjs powersoftau challenge contribute bn128 challenge_0003 response_0003 -e="some random text"
-    snarkjs powersoftau import response pot12_0002.ptau response_0003 pot12_0003.ptau -n="Third contribution name"
+    npx snarkjs powersoftau export challenge pot12_0002.ptau challenge_0003
+    npx snarkjs powersoftau challenge contribute bn128 challenge_0003 response_0003 -e="some random text"
+    npx snarkjs powersoftau import response pot12_0002.ptau response_0003 pot12_0003.ptau -n="Third contribution name"
 fi
 echo "---------------------"
 
