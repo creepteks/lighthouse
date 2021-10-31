@@ -17,8 +17,6 @@ else
     export NODE_OPTIONS=--max-old-space-size=4096
     npx circom ../circom/lighthouse.circom --r1cs --wasm --sym
     COMPILATION_RES1=$?
-    npx circom ../circom/eddsaVerifier.circom --r1cs --wasm --sym
-    COMPILATION_RES2=$?
     # npx snarkjs r1cs export json lighthouse.r1cs lighthouse.json
 fi
 echo "---------------------"
@@ -29,15 +27,6 @@ else
     echo "Error while compiling lighthouse.circom. Aborting"
     exit $COMPILATION_RES1
 fi
-
-if [ $COMPILATION_RES2 -eq 0 ]; then
-    echo "Successfully compiled eddsaVerifier.circom"
-else
-    echo "Error while compiling eddsaVerifier.circom. Aborting"
-    exit $COMPILATION_RES1
-fi
-
-
 
 # start a new powers of tau ceremony
 echo "---------------------"
@@ -134,13 +123,6 @@ else
     npx snarkjs zkey verify lighthouse.r1cs pot12_final.ptau lighthouse_final.zkey
     npx snarkjs zkey export verificationkey lighthouse_final.zkey verification_key.json
 fi
-echo "---------------------"
-
-
-
-echo "---------------------"
-echo 'Generating lighthouseVerifier.sol'
-npx snarkjs zkey export solidityverifier lighthouse_final.zkey verifier.sol
 echo "---------------------"
 
 # Copy verifier.sol to the contracts/sol directory
