@@ -1,22 +1,8 @@
 #!/bin/bash
-#
-# semaphorejs - Zero-knowledge signaling on Ethereum
-# Copyright (C) 2019 Kobi Gurkan <kobigurk@gmail.com>
-#
-# This file is part of semaphorejs.
-#
-# semaphorejs is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# semaphorejs is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with semaphorejs.  If not, see <http://www.gnu.org/licenses/>.
+
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
+# For the original implementation, refer to https://github.com/appliedzkp/semaphore/blob/master/circuits/scripts/build_snarks.sh
 
 cd "$(dirname "$0")"
 mkdir -p ../build
@@ -31,8 +17,6 @@ else
     export NODE_OPTIONS=--max-old-space-size=4096
     npx circom ../circom/lighthouse.circom --r1cs --wasm --sym
     COMPILATION_RES1=$?
-    npx circom ../circom/eddsaVerifier.circom --r1cs --wasm --sym
-    COMPILATION_RES2=$?
     # npx snarkjs r1cs export json lighthouse.r1cs lighthouse.json
 fi
 echo "---------------------"
@@ -43,15 +27,6 @@ else
     echo "Error while compiling lighthouse.circom. Aborting"
     exit $COMPILATION_RES1
 fi
-
-if [ $COMPILATION_RES2 -eq 0 ]; then
-    echo "Successfully compiled eddsaVerifier.circom"
-else
-    echo "Error while compiling eddsaVerifier.circom. Aborting"
-    exit $COMPILATION_RES1
-fi
-
-
 
 # start a new powers of tau ceremony
 echo "---------------------"
@@ -148,13 +123,6 @@ else
     npx snarkjs zkey verify lighthouse.r1cs pot12_final.ptau lighthouse_final.zkey
     npx snarkjs zkey export verificationkey lighthouse_final.zkey verification_key.json
 fi
-echo "---------------------"
-
-
-
-echo "---------------------"
-echo 'Generating lighthouseVerifier.sol'
-npx snarkjs zkey export solidityverifier lighthouse_final.zkey verifier.sol
 echo "---------------------"
 
 # Copy verifier.sol to the contracts/sol directory

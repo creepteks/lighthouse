@@ -1,4 +1,6 @@
-// Refer to:
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
+// For the original implementation, refer to:
 // https://github.com/peppersec/tornado-mixer/blob/master/circuits/merkleTree.circom
 // https://github.com/appliedzkp/semaphore/blob/master/circuits/circom/semaphore-base.circom
 

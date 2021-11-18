@@ -1,4 +1,5 @@
-// refer to 
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
 // https://github.com/appliedzkp/semaphore/blob/master/circuits/circom/semaphore-base.circom
 
 include "../node_modules/circomlib/circuits/pedersen.circom";

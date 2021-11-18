@@ -1,33 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright © 2021, M. Baghani (mahmoud.baghani@outlook.com)
+
 const Web3 = require('web3')
-const web3 = new Web3("http://localhost:8545");
-// var ethcontract = require('web3-eth-contract');
-// ethcontract.setProvider("http://localhost:8545")
+const web3 = new Web3("ws://localhost:8545");
 
 
+const catchRevert = require("../test/exceptions").catchRevert
 const { expect } = require('chai');
 const fs = require('fs');
-
-// use truffle contract as opposed to truffle's artifacts.require or truffle test-env's contract.fromArtifacts
-const truffleContract = require('@truffle/contract');
-var provider = new Web3.providers.HttpProvider("http://localhost:8545");
-
-// build MiMC contract from on-the-fly
-var poseidonJson = require('../build/PoseidonT3.json')
-var poseidon = truffleContract({contractName: poseidonJson['contractName'], abi: poseidonJson['abi'], unlinked_binary: poseidonJson['bytecode']})
-// poseidon.defaults({
-//     gas: 8500000,
-//     gasPrice: 1000000000
-//   })
-poseidon.setProvider(provider)
-
-// set semaphore and its client using truffle contract
-var semJson = require('../build/contracts/Semaphore.json')
-var semClientJson = require('../build/contracts/SemaphoreClient.json')
-var semaphore = truffleContract({contractName: semJson['contractName'], abi: semJson['abi'], unlinked_binary: semJson['bytecode']})
-var semaphoreClient = truffleContract({contractName: semClientJson.contractName, abi: semClientJson.abi, unlinked_binary: semClientJson.bytecode})
-semaphore.setProvider(provider)
-semaphoreClient.setProvider(provider)
-
 
 
 const {
@@ -63,7 +43,8 @@ const {
     packPubKey,
     unpackPubKey,
 } = require('../../client/node_modules/maci-crypto/build')
-const { utils } = require('../../client/node_modules/ffjavascript');
+
+const { utils, Scalar } = require('../../../client/node_modules/ffjavascript');
 const {
     // stringifyBigInts,
     // unstringifyBigInts,
@@ -72,7 +53,6 @@ const {
     leBuff2int,
     leInt2Buff,
 } = utils;
-const biginteger = require('../../client/node_modules/big-integer/BigInteger')
 
 const circomlib= require('circomlib')
 const poseidonHasher = circomlib.poseidon
@@ -81,13 +61,13 @@ const path = require('path')
 const ethers = require('ethers')
 const snarkjs = require('snarkjs')
 
-const NUM_LEVELS = 20
+const TREE_DEPTH = 6
 const FIRST_EXTERNAL_NULLIFIER = 0
 const SIGNAL = 'signal0'
-let semaphoreContract
-let semaphoreClientContract
-let accounts
+const votes = [0n, 1n, 2n, 3n]
+
 let owner
+let accounts
 let wtns = {type: "mem"};
 // let lighthouse_zkey_final = {type: "file"};
 let vKey;
@@ -100,111 +80,214 @@ let identityCommitment
 let proof_res
 
 // Load circuit and verifying key
-const lighthouse_circuit_path = path.join(__dirname, '../../circuits/build/lighthouse.wasm')
-const lighthouse_zkey_final = path.join(__dirname, '../../circuits/build/lighthouse_final.zkey')
-const verifyingKeyPath = path.join(__dirname, '../../circuits/build/verification_key.json')
+const lighthouse_circuit_path = path.join(__dirname, '../../../circuits/build/lighthouse.wasm')
+const lighthouse_zkey_final = path.join(__dirname, '../../../circuits/build/lighthouse_final.zkey')
+const verifyingKeyPath = path.join(__dirname, '../../../circuits/build/verification_key.json')
 
+const eddsa_circuit_path = path.join(__dirname, '../../../circuits/build/eddsaVerifier.wasm')
+const eddsa_zkey_final = path.join(__dirname, '../../../circuits/build/eddsaVerifier_final.zkey')
+const eddsaVerifyingKeyPath = path.join(__dirname, '../../../circuits/build/eddsaVerification_key.json')
 
+const MAX_VOTES = 1;
+let voteCount = 0;
+const currentEthGasPrice = 123;  // 123GWei according to https://ethgasstation.info/ as of September 2021
+const currentEthPrice = 3300; // dollars
+let txGas = 0;
+let deployGas = 0;
+let contractGas = 0;
 
-async function deploy() {
-    // define the sender of the tx
-    accounts = await web3.eth.getAccounts(/*console.log*/)
-    owner = accounts[0]
+let votingPrivKey;
+let votingPubKey;
+const initiatorEthSk = "0x2bc4341e0add33ceb264f774c9de2bfcce14cf97ac2df479b54f23bd751808d6";
+let regPrivKey;
+let regPubkey;
 
-    console.log('Deploying Poseidon')
-    poseidonContract = await poseidon.new({from: owner} )
-    console.log('Deploying Semaphore')
-    await semaphore.detectNetwork()
-    // await semaphore.link('MiMC', mimcContract.address)
-    // await semaphore.link(mimcContract)
-    await semaphore.link('PoseidonT3', poseidonContract.address)
-    semaphoreContract = await semaphore.new(NUM_LEVELS, FIRST_EXTERNAL_NULLIFIER, {from: owner})
-
-    console.log('Deploying Semaphore Client')
-    semaphoreClientContract = await semaphoreClient.new(semaphoreContract.address, {from: owner})
-
-    console.log('Transferring ownership of the Semaphore contract to the Semaphore Client')
-    await semaphoreContract.transferOwnership(
-        semaphoreClientContract.address,
-        {from: owner}
-    )
-
-    const {identity} =  await insertCommitment(owner) 
-            
-    const leaves = await semaphoreClientContract.getIdentityCommitments()
-
-    console.log("generating witness")
-    proof_res = await _genProof(
-        SIGNAL,
-        lighthouse_circuit_path,
-        identity,
-        leaves,
-        NUM_LEVELS,
-        FIRST_EXTERNAL_NULLIFIER,
-    )
-    wtns = proof_res.wtns
-    console.log("root: ", proof_res.merkleProof.root)
-    console.log("public signals ", proof_res.publicSignals)
-    console.log("generating proof and public signals")
+async function initScenario() {
+    // PHASE 01 Voting Authorities: Initialization
+    votingPrivKey = genPrivKey()
+    votingPubKey = genPubKey(votingPrivKey)
+    // define the sender of the tx in
+    accounts = await web3.eth.getAccounts()
+    owner = web3.eth.accounts.privateKeyToAccount(initiatorEthSk);
     
-    vKey = parseVerifyingKeyJson(fs.readFileSync(verifyingKeyPath).toString())
-    const res = await snarkjs.groth16.verify(vKey, proof_res.publicSignals, proof_res.proof);
-    console.log(res)
+    // registrar init
+    var pair = genKeypair();
+    regPrivKey = pair.privKey
+    regPubkey = pair.pubKey
+
 }
-
-async function prebroadcast() {
-    const signal = ethers.utils.toUtf8Bytes(SIGNAL)
-    const signalHash = genSignalHash(signal).toString()
-    console.log("using root ", proof_res.merkleProof.root)
-    const check = await semaphoreContract.preBroadcastCheck(
-        signal,
-        proof_res.proof,
-        proof_res.merkleProof.root,
-        proof_res.publicSignals[1],
-        signalHash,
-        FIRST_EXTERNAL_NULLIFIER,
-        {from: owner}
-    )
-    // expect(check).to.be.true
-}
-
-async function broadcast() {
-     // expect.assertions(3)
-     const tx = await semaphoreClientContract.broadcastSignal(
-        ethers.utils.toUtf8Bytes(SIGNAL),
-        proof_res.proof,
-        proof_res.merkleProof.root,
-        proof_res.publicSignals[1],
-        FIRST_EXTERNAL_NULLIFIER,
-    )
-    const receipt = tx.receipt
-    // expect(receipt.status).to.equal(1)
-    console.log('Gas used by broadcastSignal():', receipt.gasUsed.toString())
-
-    const index = (await semaphoreClientContract.nextSignalIndex()) - 1
-    const signal = await semaphoreClientContract.signalIndexToSignal(index.toString())
-
-    // expect(ethers.utils.toUtf8String(signal)).to.equal(SIGNAL)
-}
-
-async function insertCommitment(owner) {
+const doScenario = async function(semaphoreInstance) {
+    // PHASE 01 VOTER: CREATING IDENTITY
     const identity = genIdentity();
     const identityCommitment = genIdentityCommitment(identity);
-
-    const tx = await semaphoreClientContract.insertIdentityAsClient(
-        identityCommitment.toString(),
-        { from: owner }
-    ).then(function(result) {
-        // result.tx => transaction hash, string
-        // result.logs => array of trigger events (1 item in this case)
-        // result.receipt => receipt object
-        for (let index = 0; index < result.logs.length; index++) {
-            const element = result.logs[index];
-            console.log(element)
-        }
-      });;
     
-    insertedIdentityCommitments.push('0x' + identityCommitment.toString(16))
+
+    // PHASE 02 REGISTRATION
+    // the registrar signs the commitment
+    const { signature, msg } = genEdDSA(
+        regPrivKey,
+        identityCommitment,
+    )
+    // the voter (or someone on ü's behalf) register the voter's identity commitment
+    var regTx = semaphoreInstance.methods.registerVoter(
+        stringifyBigInts(identityCommitment),
+        [stringifyBigInts(regPubkey[0]), stringifyBigInts(regPubkey[1])],
+        [stringifyBigInts(signature.R8[0]), stringifyBigInts(signature.R8[1])],
+        stringifyBigInts(signature.S)
+    )
+    var regVoterReceipt = await send(web3, owner, regTx);
+    console.log("spent gas for registration ", regVoterReceipt.gasUsed)
+    txGas += regVoterReceipt.gasUsed
+    console.log("registered voter ", regVoterReceipt.status);
+    insertedIdentityCommitments.push(identityCommitment)
+
+
+    // PHASE 03 VOTING
+
+    // voter creates an ephemeral key pair
+    var ephemeralPair = genKeypair();
+    console.log("selected ephemeral key ", ephemeralPair.pubKey)
+
+    // voter computes the shared key
+    const sharedKey = genEcdhSharedKey(ephemeralPair.privKey, votingPubKey)
+    console.log("shared key from voter perspective ", sharedKey)
+
+    // voter creates a vote, but it's a test-vote as of now
+    var vote = votes[Math.floor(Math.random()*votes.length)];
+    console.log("voter's selected vote ", vote.toString())
+    var plaintext = []
+    for (let i = 0; i < 1; i++) {
+        plaintext.push(BigInt(vote))
+    }
+    // voter encrypts his voice with the shared key
+    var encVote = encrypt(plaintext, sharedKey)
+    
+    // this fixes the `param.substring() is not a function` bug
+    // in ABICoder.prototype.formatParam in web3.eth.abi
+    var sig = ethers.utils.toUtf8Bytes(encVote.toString())
+    var sigbyte = []
+    if (sig.length % 2 != 0) {
+        sigbyte.push(0)
+    }
+    for (let i = 0; i < sig.length; i++) {
+        sigbyte.push(sig[i]);
+    }
+    
+    // getting all the commitments on chain, to create a zk-proof of membership
+    semaphoreInstance.methods.getIdentityCommitments().call({ from: accounts[0] }, async function(err, leaves){
+        console.log("generating proof")
+        proof_res = await genLighthouseProof(
+            sigbyte,
+            lighthouse_circuit_path,
+            identity,
+            leaves,
+            TREE_DEPTH,
+            FIRST_EXTERNAL_NULLIFIER,
+        )
+        console.log("root: ", proof_res.merkleProof.root)
+        console.log("public signals ", proof_res.publicSignals)
+        console.log("generating proof and public signals")
+        
+        vKey = parseVerifyingKeyJson(fs.readFileSync(verifyingKeyPath).toString())
+        const res = await snarkjs.groth16.verify(vKey, proof_res.publicSignals, proof_res.proof);
+        console.log("proof validity: ", res)
+
+        // sending the vote transaction
+        console.log("send the vote tx")
+
+        // voter (or someone on ü's behalf) sends the vote tx
+        var params = genBroadcastSignalParams(SIGNAL, proof_res.proof, proof_res.publicSignals)
+        var tx = semaphoreInstance.methods.vote(
+            ephemeralPair.pubKey,
+            encVote,
+            sigbyte, 
+            params.proof,
+            params.root,
+            params.nullifiersHash,
+            params.externalNullifier
+        )
+        var receipt = await send(web3, owner, tx)
+        console.log("spent gas for voting ", receipt.gasUsed)
+        txGas += receipt.gasUsed
+        console.log("voted ", receipt.status)
+
+        voteCount++
+        if (voteCount < MAX_VOTES)
+        {
+            doScenario(semaphoreInstance)
+        }
+        else
+        {
+            // the scenario is finished
+            console.log("Total lib deployment gas: ", deployGas)
+            console.log("Total contract deployment gas: ", contractGas)
+            console.log("Total gas spent: ", txGas)
+            console.log("Total price of tx: ", txGas * currentEthGasPrice / 1000000000 , "eth")
+            doTally(semaphoreInstance)
+        }
+    });
+}
+
+const doTally = async function(semaphoreInstance) {
+    semaphoreInstance.methods.getBallots().call({ from: accounts[0] }, async function(err, ballots){
+        for (let i = 0; i < ballots.length; i++) {
+            const ballot = ballots[i];
+            const key = ballot.pubKey
+            console.log("voter ephemeral key ", key)
+            const encVote = ballot.encVote
+            const sharedKey = genEcdhSharedKey(votingPrivKey, [unstringifyBigInts(key[0]), unstringifyBigInts(key[1])])
+            console.log("shared key from tally PoV ", sharedKey)
+            var vote = decrypt(encVote, sharedKey)
+            console.log("decrypted vote ", vote.toString())
+        }
+    });
+}
+
+async function send(web3, account, transaction) {
+    while (true) {
+        try {
+            const options = {
+                data: transaction.encodeABI(),
+                to: transaction._parent._address,
+                // gas: await transaction.estimateGas({ from: account.address }),
+                gas: 2100000,
+                gasPrice: currentEthGasPrice * 1000000000,
+            };
+            const signed = await web3.eth.accounts.signTransaction(options, account.privateKey);
+            const receipt = await web3.eth.sendSignedTransaction(signed.rawTransaction);
+            return receipt;
+        }
+        catch (error) {
+            console.log(error)
+            return error
+        }
+    }
+}
+
+async function startScenario() {
+    const { 
+        startDeployment,
+        deploySemaphore,
+    } = await require('./deployLighthouse_web3')
+    await startDeployment(function() {
+        deploySemaphore(async function(semaphoreInstance) {
+            await initScenario()
+            doScenario(semaphoreInstance)
+        }, function(gasUsed) {
+            console.log("contract gas used: ", gasUsed)
+            contractGas += gasUsed
+        })
+    }, function(gasUsed) {
+        console.log("library used gas: ", gasUsed)
+        deployGas += gasUsed
+    })
+}
+
+function clearPreviousTests() {
+    insertedIdentityCommitments = []
+}
+async function insertCommitment(owner, semCliInstance) {
+
 
     return { tx, identityCommitment, identity };
 }
@@ -223,8 +306,8 @@ const genIdentity = (
     // values
     return {
         keypair: genKeypair(),
-        identityNullifier: genRandomSalt(),
-        identityTrapdoor: genRandomSalt(),
+        identityNullifier: genRandomSalt(31),
+        identityTrapdoor: genRandomSalt(31),
     }
 }
 
@@ -232,14 +315,15 @@ const genIdentityCommitment = (
     identity,
 ) => {
 
-    return pedersenHash([
+    const hasher = poseidonHasher
+    return hasher([
         circomlib.babyJub.mulPointEscalar(identity.keypair.pubKey, 8)[0],
         identity.identityNullifier,
         identity.identityTrapdoor,
     ])
 }
 
-const _genProof = async (
+const genLighthouseProof = async (
     signal,
     circuit,
     identity,
@@ -252,40 +336,28 @@ const _genProof = async (
     // convert idCommitments
     const idCommitmentsAsBigInts = []
     for (let idc of idCommitments) {
-        idCommitmentsAsBigInts.push(stringifyBigInts(biginteger(idc.toString())))
+        idCommitmentsAsBigInts.push(idc.toString())
     }
 
     const identityCommitment = genIdentityCommitment(identity)
     const index = idCommitmentsAsBigInts.indexOf(stringifyBigInts(identityCommitment))
+
     const tree = new IncrementalQuinTree(treeDepth, NOTHING_UP_MY_SLEEVE, 2)
-    // for (let ic of idCommitments) {
-    //     tree.insert(unstringifyBigInts(ic))
-    // }
-    tree.insert(identityCommitment)
 
-    const merkleProof = await tree.genMerklePath(index)
+    for (let ic of idCommitments) {
+        tree.insert(unstringifyBigInts(ic))
+    }
+    tree.update(index, identityCommitment)
 
-    const signalHash = keccak256HexToBigInt(ethers.utils.hexlify(ethers.utils.toUtf8Bytes(signal)))
+    const merkleProof = tree.genMerklePath(index)
 
-    const { signature, msg } = genSignedMsg(
+    const signalHash = keccak256HexToBigInt(ethers.utils.hexlify((signal)))
+
+    const { signature, msg } = genEdDSAPoseidon(
         identity.keypair.privKey,
         externalNullifier,
         signalHash, 
     )
-    var input = {
-        identity_pk: stringifyBigInts(identity.keypair.pubKey),
-        auth_sig_r: stringifyBigInts(signature.R8),
-        auth_sig_s: stringifyBigInts(signature.S),
-        signal_hash: stringifyBigInts(signalHash),
-        external_nullifier: stringifyBigInts(externalNullifier),
-        identity_nullifier: stringifyBigInts(identity.identityNullifier),
-        identity_trapdoor: stringifyBigInts(identity.identityTrapdoor),
-        identity_path_elements: stringifyBigInts(merkleProof.pathElements),
-        identity_path_index: stringifyBigInts(merkleProof.indices),
-        fake_zero: stringifyBigInts(biginteger(0)),
-    }
-    fs.writeFileSync(path.join(__dirname, '../data/input.json'), JSON.stringify(input, null, 2))
-
     const {proof, publicSignals} = await snarkjs.groth16.fullProve({
         identity_pk: identity.keypair.pubKey,
         auth_sig_r: signature.R8,
@@ -303,20 +375,36 @@ const _genProof = async (
     // shell.exec(`node --max-old-space-size=16384 --stack-size=1073741 ../node_modules/snarkjs/cli.js groth16 fullprove ../data/input.json ../../circuits/build/lighthouse.wasm lighthouse_final.zkey ../data/proof.json ../data/public.json`)
    
     return {
-        wtns,
         signal,
         signalHash,
-        // signature,
-        // msg,
         tree,
-        // identityPath,
-        // identityPathIndex,
-        // identityPathElements,
         merkleProof, 
         proof, 
         publicSignals
     }
 }
+
+const genEddsaProof = async (
+    identityCommitment,
+    signerPubkey,
+    signature,
+    circuit_path,
+    zkey_final
+) => {
+
+    const {proof, publicSignals} = await snarkjs.groth16.fullProve({
+        signer_pk: signerPubkey,
+        identity_commitment: identityCommitment,
+        auth_sig_r: signature.R8,
+        auth_sig_s: signature.S,
+    }, circuit_path, zkey_final);
+
+    return {
+        proof, 
+        publicSignals
+    }
+}
+
 
 const pedersenHash = (ints) => {
 
@@ -328,7 +416,7 @@ const pedersenHash = (ints) => {
         )
     )
 
-    return biginteger(p[0])
+    return BigInt(p[0])
 }
 
 const keccak256HexToBigInt = (
@@ -345,16 +433,27 @@ const keccak256HexToBigInt = (
     return signalHash
 }
 
-const genSignedMsg = (
+const genEdDSAPoseidon = (
     privKey,
-    externalNullifier,
-    signalHash,
+    lhs,
+    rhs,
 ) => {
     const hasher = poseidonHasher
     const msg = hasher([
-        externalNullifier,
-        signalHash,
+        lhs,
+        rhs,
     ])
+
+    return {
+        msg,
+        signature: sign(privKey, msg),
+    }
+}
+
+const genEdDSA = (
+    privKey,
+    msg,
+) => {
 
     return {
         msg,
@@ -370,4 +469,75 @@ const parseVerifyingKeyJson = (
     return unstringifyBigInts(JSON.parse(verifyingKeyStr))
 }
 
-scenario()
+const formatForVerifierContract = (
+    proof,
+    publicSignals,
+) => {
+    const stringify = (x) => x.toString()
+
+    return {
+        a: [ proof.pi_a[0].toString(), proof.pi_a[1].toString() ],
+        b: [ 
+            [ proof.pi_b[0][1].toString(), proof.pi_b[0][0].toString() ],
+            [ proof.pi_b[1][1].toString(), proof.pi_b[1][0].toString() ],
+        ],
+        c: [ proof.pi_c[0].toString(), proof.pi_c[1].toString() ],
+        input: publicSignals.map(stringify),
+    }
+}
+
+const genRegisterVoterParams = (
+    proof,
+    publicSignals,
+) => {
+    return formatForVerifierContract(proof, publicSignals)
+    // const formatted = formatForVerifierContract(proof, publicSignals)
+    // return {
+    //     proof: [
+    //         formatted.a,
+    //         formatted.b[0],
+    //         formatted.b[1],
+    //         formatted.c,
+    //     ],
+    //     signerPubkey: formatted.input[0],
+    //     identityCommitment: formatted.input[2]
+    // }
+
+}
+
+const genBroadcastSignalParams = (
+    signal,
+    proof,
+    publicSignals,
+) => {
+    const formatted = formatForVerifierContract(proof, publicSignals)
+
+    return {
+        signal: ethers.utils.toUtf8Bytes(signal),
+        proof: [
+            ...formatted.a,
+            ...formatted.b[0],
+            ...formatted.b[1],
+            ...formatted.c,
+        ],
+        root: formatted.input[0],
+        nullifiersHash: formatted.input[1],
+        // The signal hash (formatted.input[2]) isn't passed to broadcastSignal
+        // as the contract will generate (and then verify) it
+        externalNullifier: formatted.input[3],
+    }
+}
+
+
+function test() {
+    // params of baby jubjub
+    const order = Scalar.fromString("21888242871839275222246405745257275088614511777268538073601725287587578984328");
+    const subOrder = Scalar.shiftRight(order, 3);
+    const superorder = Scalar.shiftLeft(order, 3);
+    console.log(stringifyBigInts(order))
+    console.log(stringifyBigInts(subOrder))
+    console.log(stringifyBigInts(superorder))
+}
+
+startScenario()
+// test()
