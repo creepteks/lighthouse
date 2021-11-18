@@ -140,3 +140,5 @@ package-lock.json
 
 # neo
 data/
+# ignore solc compiler
+/ethcode/solc
