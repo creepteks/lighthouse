@@ -142,3 +142,5 @@ package-lock.json
 data/
 # ignore auto-generated snarks verifier contract
 ethcode/contracts/verifier.sol
+# ignore solc compiler
+/ethcode/solc
