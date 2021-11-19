@@ -14,6 +14,11 @@ node --version
 ```
 which should print out the version.
 
+**npx**: Install Nodejs package runner via:
+```bash
+npm install -g npx
+```
+
 **Solidity Compiler**:
 The `compile_sol.sh` script provides you with appropriate `solc` version needed for the project. However, you can install `solc` via tools like [svm](https://github.com/web3j/svm) or Solidity binary packages manually.
 
