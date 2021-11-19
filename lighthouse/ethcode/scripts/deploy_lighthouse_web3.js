@@ -49,57 +49,6 @@ async function startDeployment(deployMainContract, reportLibGas) {
     })
     .then(function(_instance) {
         poseidonT3Instance = _instance
-    } );
-
-    // creating the poseidonT6 contract by compilation
-    var poseidonT6Json = require('../build/PoseidonT6.json')
-    var poseidonT6Contract = new ethcontract(poseidonT6Json.abi)
-    poseidonT6Contract.deploy({data: poseidonT6Json.bytecode})
-    .send({
-        from:  owner,
-        gas: 8500000,
-        gasPrice: '100000000000'
-    }, function(error, transactionHash){ })
-    .on('error', function(error){
-        console.error(error)
-    })
-    .on('transactionHash', function(transactionHash){
-        console.log("poseidonT6 deploy tx hash ", transactionHash)
-    })
-    .on('receipt', function(receipt){
-        // contains the new contract address
-        reportLibGas(receipt.gasUsed)
-    })
-    .on('confirmation', function(confirmationNumber, receipt){ 
-    })
-    .then(function(_instance) {
-        poseidonT6Instance = _instance
-    } );
-
-    // creating the CurveBabyJubjub contract by compilation
-    var babyjubAbi = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../build/JubJub.abi'), 'utf-8').toString())
-    var babyjubBin = fs.readFileSync(path.resolve(__dirname, '../../build/JubJub.bin'), 'utf-8').toString()
-    var babyJubContract = new ethcontract(babyjubAbi)
-    babyJubContract.deploy({data: babyjubBin})
-    .send({
-        from:  owner,
-        gas: 8500000,
-        gasPrice: '100000000000'
-    }, function(error, transactionHash){ })
-    .on('error', function(error){
-        console.error(error)
-    })
-    .on('transactionHash', function(transactionHash){
-        console.log("babyjubjub deploy tx hash ", transactionHash)
-    })
-    .on('receipt', function(receipt){
-        // contains the new contract address
-        reportLibGas(receipt.gasUsed)
-    })
-    .on('confirmation', function(confirmationNumber, receipt){
-     })
-    .then(function(_instance) {
-        babyJubjubInstance = _instance
         deployMainContract()
     } );
 }
@@ -108,22 +57,18 @@ async function deploySemaphore(afterDeployment, reportContractGas){
     console.log("using poseidon addr: ", poseidonT3Instance.options.address) // instance with the new contract address
     
     // use solc linker to link the Poseidon address to Semaphore bytecode
-    var semAbiPath = path.resolve(__dirname, '../../build/beacon.abi')
-    var semBinPath = path.resolve(__dirname, '../../build/beacon.bin')
+    var semAbiPath = path.resolve(__dirname, '../build/beacon.abi')
+    var semBinPath = path.resolve(__dirname, '../build/beacon.bin')
     shell.exec(`solc --link `
         + semBinPath
-        + ` --libraries contracts/Poseidon.sol:PoseidonT3:`
-        + poseidonT3Instance.options.address
-        + ` --libraries contracts/Poseidon.sol:PoseidonT6:`
-        + poseidonT6Instance.options.address
-        + ` --libraries contracts/JubJub.sol:JubJub:`
-        + babyJubjubInstance.options.address);
+        + ` --libraries ../contracts/Poseidon.sol:PoseidonT3:`
+        + poseidonT3Instance.options.address);
 
     var semAbi = JSON.parse(fs.readFileSync(semAbiPath, 'utf-8').toString())
     var semBin = fs.readFileSync(semBinPath, 'utf-8').toString()
     
     var semaphoreContract = new ethcontract(semAbi)
-    semaphoreContract.deploy({data: '0x' + semBin, arguments: [20, 0]})
+    semaphoreContract.deploy({data: '0x' + semBin, arguments: [6, 0]})
     .send({
         from:  owner,
         gas: 8500000,

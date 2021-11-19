@@ -23,4 +23,4 @@ chmod a+x $solcBin
 echo 'Building contracts'
 $solcBin --bin --abi --optimize-runs 200 ./contracts/*.sol -o ./build/ --overwrite
 cd scripts
-node createPoseidon.js
+node create_poseidon.js

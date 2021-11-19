@@ -1,9 +1,11 @@
+cd "$(dirname "$0")"
+mkdir -p ../build
+cd ../build
+
 # remove circom build artifact
-rm ./build/lighthouse*
-rm ./build/eddsaVerifier*
+rm ./lighthouse*
 # remove verification keys
-rm ./build/verification_key.json
-rm ./build/eddsaverification_key.json
+rm ./verification_key.json
 # remove challenges and response used in trusted setup
-rm ./build/challenge_phase2*
-rm ./build/response_phase2*
+rm ./challenge_phase2*
+rm ./response_phase2*

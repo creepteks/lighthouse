@@ -44,7 +44,7 @@ const {
     unpackPubKey,
 } = require('../../client/node_modules/maci-crypto/build')
 
-const { utils, Scalar } = require('../../../client/node_modules/ffjavascript');
+const { utils, Scalar } = require('../../client/node_modules/ffjavascript');
 const {
     // stringifyBigInts,
     // unstringifyBigInts,
@@ -80,15 +80,11 @@ let identityCommitment
 let proof_res
 
 // Load circuit and verifying key
-const lighthouse_circuit_path = path.join(__dirname, '../../../circuits/build/lighthouse.wasm')
-const lighthouse_zkey_final = path.join(__dirname, '../../../circuits/build/lighthouse_final.zkey')
-const verifyingKeyPath = path.join(__dirname, '../../../circuits/build/verification_key.json')
+const lighthouse_circuit_path = path.join(__dirname, '../../circuits/build/lighthouse.wasm')
+const lighthouse_zkey_final = path.join(__dirname, '../../circuits/build/lighthouse_final.zkey')
+const verifyingKeyPath = path.join(__dirname, '../../circuits/build/verification_key.json')
 
-const eddsa_circuit_path = path.join(__dirname, '../../../circuits/build/eddsaVerifier.wasm')
-const eddsa_zkey_final = path.join(__dirname, '../../../circuits/build/eddsaVerifier_final.zkey')
-const eddsaVerifyingKeyPath = path.join(__dirname, '../../../circuits/build/eddsaVerification_key.json')
-
-const MAX_VOTES = 1;
+const MAX_VOTES = 40;
 let voteCount = 0;
 const currentEthGasPrice = 123;  // 123GWei according to https://ethgasstation.info/ as of September 2021
 const currentEthPrice = 3300; // dollars
@@ -230,6 +226,7 @@ const doScenario = async function(semaphoreInstance) {
 
 const doTally = async function(semaphoreInstance) {
     semaphoreInstance.methods.getBallots().call({ from: accounts[0] }, async function(err, ballots){
+        console.time('tally')
         for (let i = 0; i < ballots.length; i++) {
             const ballot = ballots[i];
             const key = ballot.pubKey
@@ -240,6 +237,7 @@ const doTally = async function(semaphoreInstance) {
             var vote = decrypt(encVote, sharedKey)
             console.log("decrypted vote ", vote.toString())
         }
+        console.timeEnd('tally')
     });
 }
 
@@ -268,7 +266,7 @@ async function startScenario() {
     const { 
         startDeployment,
         deploySemaphore,
-    } = await require('./deployLighthouse_web3')
+    } = await require('./deploy_lighthouse_web3')
     await startDeployment(function() {
         deploySemaphore(async function(semaphoreInstance) {
             await initScenario()
@@ -358,6 +356,7 @@ const genLighthouseProof = async (
         externalNullifier,
         signalHash, 
     )
+    console.time('groth16 proof time')
     const {proof, publicSignals} = await snarkjs.groth16.fullProve({
         identity_pk: identity.keypair.pubKey,
         auth_sig_r: signature.R8,
@@ -370,7 +369,8 @@ const genLighthouseProof = async (
         identity_path_index: merkleProof.indices,
         fake_zero: 0
     }, lighthouse_circuit_path, lighthouse_zkey_final);
-
+    console.timeEnd('groth16 proof time')
+    
     // shell.env['NODE_OPTIONS'] = '--max-old-space-size=16384'
     // shell.exec(`node --max-old-space-size=16384 --stack-size=1073741 ../node_modules/snarkjs/cli.js groth16 fullprove ../data/input.json ../../circuits/build/lighthouse.wasm lighthouse_final.zkey ../data/proof.json ../data/public.json`)
    
