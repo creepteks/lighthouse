@@ -44,7 +44,7 @@ To start a test voting scenario, you have to follow 4 steps:
 The current protocol needs trusted setup in order to function. A non-secure, development-only trusted setup can be preformed by `fast_build_circuits.sh`. For more info on how to do a trusted setup as MPC, refer to [snarkjs](https://github.com/iden3/snarkjs), since the current protocol uses snarkjs for zkSNARKs proofs and verifications.
 ```bash 
 cd circuits
-./scripts/fast_build_snarks.sh
+./scripts/fast_build_circuits.sh
 cd ..
 ```
 ### 02: Using a test blockchain
